@@ -1,0 +1,49 @@
+<section class="panel">
+  <header class="panel__title">
+    <h1>{{t 'menu_upload'}}</h1>
+  </header>
+  <form id="gcode-form" class="form" enctype="multipart/form-data">
+    <label>
+      <span>{{t 'upload_gcode'}}</span>
+      <input type="file" name="file" accept=".gcode,.gco,.gc" required>
+    </label>
+    <label>
+      <span>{{t 'id_number'}}</span>
+      <input type="text" name="filamentId" placeholder="ABC123...">
+    </label>
+    <label>
+      <span>Job</span>
+      <input type="text" name="jobName" placeholder="Mein Druckjob">
+    </label>
+    <button type="submit" class="btn">{{t 'upload_gcode'}}</button>
+  </form>
+
+  <div id="gcode-result" class="gcode-result" hidden>
+    <h2>Analyse</h2>
+    <dl>
+      <div>
+        <dt>Quelle</dt>
+        <dd id="gcode-source"></dd>
+      </div>
+      <div>
+        <dt>Verbrauch (g)</dt>
+        <dd id="gcode-grams"></dd>
+      </div>
+      <div>
+        <dt>Länge (m)</dt>
+        <dd id="gcode-meters"></dd>
+      </div>
+      <div>
+        <dt>Gesamt E</dt>
+        <dd id="gcode-total"></dd>
+      </div>
+    </dl>
+    <div id="gcode-filament" class="gcode-filament" hidden>
+      <h3>{{t 'name'}}</h3>
+      <p id="gcode-filament-name"></p>
+      <p><strong>{{t 'remaining'}}:</strong> <span id="gcode-filament-remaining"></span> g</p>
+      <a id="gcode-print-label" class="btn" href="#" target="_blank">{{t 'reprint_label'}}</a>
+    </div>
+  </div>
+</section>
+

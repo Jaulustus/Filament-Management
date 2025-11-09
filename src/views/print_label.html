@@ -1,0 +1,33 @@
+{{#if notFound}}
+  <section class="panel">
+    <p>Label nicht gefunden.</p>
+  </section>
+{{else}}
+  <section class="label-page">
+    <div class="label" id="label" data-id="{{label.id}}">
+      <div class="label__header">
+        <h1>{{label.name}}</h1>
+        <p>{{label.manufacturer}} – {{label.material}} – {{formatDecimal label.diameterMm 2}} mm</p>
+      </div>
+      <div class="label__codes">
+        <img src="{{label.barcodeUrl}}" alt="Barcode" class="label__barcode">
+        <img src="{{label.qrUrl}}" alt="QR" class="label__qr">
+      </div>
+      <div class="label__meta">
+        <p><strong>ID:</strong> {{label.id}}</p>
+        <p><strong>{{t 'colors'}}:</strong>
+          {{#each label.colors}}
+            <span class="color-swatch" style="--color: {{this}}" title="{{this}}"></span>
+          {{/each}}
+        </p>
+        <p><strong>{{t 'net_weight'}}:</strong> {{label.netWeightG}} g</p>
+        <p><strong>{{t 'remaining'}}:</strong> {{formatDecimal label.remainingG 2}} g</p>
+      </div>
+    </div>
+    <button class="btn" id="print-button">{{t 'print_label'}}</button>
+  </section>
+  <script>
+    document.getElementById('print-button').addEventListener('click', () => window.print());
+  </script>
+{{/if}}
+

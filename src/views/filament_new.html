@@ -1,0 +1,72 @@
+<section class="panel">
+  <header class="panel__title">
+    <h1>{{t 'menu_new'}}</h1>
+  </header>
+
+  <form id="filament-form" class="form" data-mode="create">
+    <div class="form__grid">
+      <label>
+        <span>{{t 'name'}}</span>
+        <input type="text" name="name" required>
+      </label>
+      <label>
+        <span>{{t 'id_number'}}</span>
+        <input type="text" name="id" value="{{defaultId}}" readonly>
+      </label>
+      <label>
+        <span>{{t 'manufacturer'}}</span>
+        <input type="text" name="manufacturer" required>
+      </label>
+      <label>
+        <span>{{t 'material'}}</span>
+        <input type="text" name="material" required>
+      </label>
+      <label>
+        <span>{{t 'diameter'}}</span>
+        <input type="number" step="0.01" name="diameterMm" required>
+      </label>
+      <label>
+        <span>{{t 'density'}}</span>
+        <input type="number" step="0.01" name="density" required>
+      </label>
+      <label>
+        <span>{{t 'net_weight'}}</span>
+        <input type="number" step="1" name="netWeightG" required>
+      </label>
+      <label>
+        <span>{{t 'remaining'}}</span>
+        <input type="number" step="0.01" name="remainingG" placeholder="{{t 'remaining'}}">
+      </label>
+      <label class="colors-field">
+        <span>{{t 'colors'}}</span>
+        <span class="form__hint">{{t 'colors_hint'}}</span>
+        <div class="color-list" id="color-list"></div>
+        <div class="color-actions">
+          <input type="color" id="color-picker" value="#ffffff">
+          <button type="button" id="add-color">{{t 'add_color'}}</button>
+        </div>
+      </label>
+      <label>
+        <span>{{t 'price_new'}}</span>
+        <input type="number" step="0.01" name="priceNewEUR">
+      </label>
+      <label>
+        <span>{{t 'product_link'}}</span>
+        <input type="url" name="productUrl">
+      </label>
+      <label>
+        <span>{{t 'location'}}</span>
+        <input type="text" name="location">
+      </label>
+      <label class="full">
+        <span>{{t 'notes'}}</span>
+        <textarea name="notes" rows="4"></textarea>
+      </label>
+    </div>
+    <footer class="form__actions">
+      <button type="submit" class="btn">{{t 'create'}}</button>
+      <a id="print-label-link" class="btn btn--ghost" href="#" hidden>{{t 'print_label'}}</a>
+    </footer>
+  </form>
+</section>
+

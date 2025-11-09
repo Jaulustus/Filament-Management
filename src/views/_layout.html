@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="{{lang}}">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{{t 'app_title'}}</title>
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body data-lang="{{lang}}">
+  <header class="topbar">
+    <div class="topbar__title">
+      <a href="/">{{t 'app_title'}}</a>
+    </div>
+    <nav class="topbar__nav">
+      <a href="/">{{t 'menu_home'}}</a>
+      <a href="/filaments/new">{{t 'menu_new'}}</a>
+      <a href="/upload-gcode">{{t 'menu_upload'}}</a>
+    </nav>
+    <div class="topbar__actions">
+      <div class="topbar__language">
+        <span>{{t 'language'}}:</span>
+        {{#each languages}}
+          <a class="lang-link {{#if (eq ../lang this)}}active{{/if}}" href="?lang={{this}}">{{uppercase this}}</a>
+        {{/each}}
+      </div>
+      <a class="topbar__add" href="/filaments/new" aria-label="{{t 'menu_new'}}">+</a>
+    </div>
+  </header>
+
+  <main class="main">
+    {{{body}}}
+  </main>
+
+  <script>
+    window.__LANG__ = "{{lang}}";
+    window.__T__ = {{{json translationStrings}}};
+  </script>
+  <script src="/js/app.js" defer></script>
+</body>
+</html>
+
