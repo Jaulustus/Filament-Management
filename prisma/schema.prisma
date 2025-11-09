@@ -1,0 +1,40 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model Filament {
+  id            String   @id
+  name          String
+  manufacturer  String
+  material      String
+  diameterMm    Decimal
+  density       Decimal
+  netWeightG    Int
+  remainingG    Decimal
+  gramsPerMeter Decimal
+  colorsHex     String?
+  priceNewEUR   Decimal?
+  productUrl    String?
+  location      String?
+  notes         String?
+  archived      Boolean  @default(false)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  logs          UsageLog[]
+}
+
+model UsageLog {
+  id         Int      @id @default(autoincrement())
+  filamentId String
+  usedG      Decimal
+  source     String
+  jobName    String?
+  createdAt  DateTime @default(now())
+  Filament   Filament @relation(fields: [filamentId], references: [id], onDelete: Cascade)
+}
+
