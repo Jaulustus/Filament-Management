@@ -7,21 +7,42 @@
     <div class="label" id="label" data-id="{{label.id}}">
       <div class="label__header">
         <h1>{{label.name}}</h1>
-        <p>{{label.manufacturer}} – {{label.material}} – {{formatDecimal label.diameterMm 2}} mm</p>
+        <p>{{label.manufacturer}} – {{label.material}} – {{formatLength label.diameterMm ui.form.units.length}} {{ui.form.units.length}}</p>
       </div>
-      <div class="label__codes">
-        <img src="{{label.barcodeUrl}}" alt="Barcode" class="label__barcode">
-        <img src="{{label.qrUrl}}" alt="QR" class="label__qr">
-      </div>
+      {{#if (eq labelType 'both')}}
+        <div class="label__codes">
+          <img src="{{label.barcodeUrl}}" alt="Barcode" class="label__barcode" style="width: {{formatDecimal label.barcodeWidthPx 2}}px; height: {{formatDecimal label.barcodeHeightPx 2}}px;">
+          <img src="{{label.qrUrl}}" alt="QR" class="label__qr" style="width: {{formatDecimal label.qrSizePx 2}}px; height: {{formatDecimal label.qrSizePx 2}}px;">
+        </div>
+      {{else}}
+        <div class="label__codes label__codes--single">
+          {{#if (eq labelType '1d')}}
+            <img src="{{label.barcodeUrl}}" alt="Barcode" class="label__barcode" style="width: {{formatDecimal label.barcodeWidthPx 2}}px; height: {{formatDecimal label.barcodeHeightPx 2}}px;">
+          {{else}}
+            <img src="{{label.qrUrl}}" alt="QR" class="label__qr" style="width: {{formatDecimal label.qrSizePx 2}}px; height: {{formatDecimal label.qrSizePx 2}}px;">
+          {{/if}}
+        </div>
+      {{/if}}
       <div class="label__meta">
         <p><strong>ID:</strong> {{label.id}}</p>
         <p><strong>{{t 'colors'}}:</strong>
           {{#each label.colors}}
-            <span class="color-swatch" style="--color: {{this}}" title="{{this}}"></span>
+            <span class="color-variant">
+              {{#if labelKey}}<span class="color-variant__label">{{t labelKey}}</span>{{/if}}
+              {{#each swatches}}
+                <span class="color-swatch {{#if glow}}color-swatch--glow{{/if}}" style="--color: {{hex}}" title="{{hex}}"></span>
+              {{/each}}
+              {{#if transparent}}
+                <span class="color-tag color-tag--transparent">{{t 'color_transparent'}}</span>
+              {{/if}}
+              {{#if count}}
+                <span class="color-variant__meta">×{{count}}</span>
+              {{/if}}
+            </span>
           {{/each}}
         </p>
-        <p><strong>{{t 'net_weight'}}:</strong> {{label.netWeightG}} g</p>
-        <p><strong>{{t 'remaining'}}:</strong> {{formatDecimal label.remainingG 2}} g</p>
+        <p><strong>{{t 'net_weight'}}:</strong> {{formatWeight label.netWeightG ui.form.units.weight}} {{ui.form.units.weight}}</p>
+        <p><strong>{{t 'remaining'}}:</strong> {{formatWeight label.remainingG ui.form.units.weight}} {{ui.form.units.weight}}</p>
       </div>
     </div>
     <button class="btn" id="print-button">{{t 'print_label'}}</button>

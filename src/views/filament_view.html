@@ -7,6 +7,7 @@
     <header class="panel__title">
       <h1>{{filament.name}}</h1>
       <div class="panel__actions">
+        <a class="btn btn--ghost" href="/filaments/{{filament.id}}/edit">{{t 'edit_filament'}}</a>
         <a class="btn" href="/print/label/{{filament.id}}" target="_blank">{{t 'reprint_label'}}</a>
         <button class="btn" type="button" data-action="duplicate">{{t 'duplicate'}}</button>
         {{#if filament.archived}}
@@ -14,6 +15,7 @@
         {{else}}
           <button class="btn btn--danger" data-action="archive">{{t 'archive'}}</button>
         {{/if}}
+        <button class="btn btn--danger" type="button" data-action="delete">{{t 'delete'}}</button>
       </div>
     </header>
 
@@ -27,8 +29,8 @@
         <p>{{filament.material}}</p>
       </div>
       <div>
-        <h3>{{t 'diameter'}}</h3>
-        <p>{{formatDecimal filament.diameterMm 2}} mm</p>
+        <h3>{{t 'diameter'}} ({{ui.form.units.length}})</h3>
+        <p>{{formatLength filament.diameterMm ui.form.units.length}} {{ui.form.units.length}}</p>
       </div>
       <div>
         <h3>{{t 'density'}}</h3>
@@ -36,24 +38,45 @@
       </div>
       <div>
         <h3>{{t 'colors'}}</h3>
-        <div class="color-swatches">
-          {{#each filament.colorsHex}}
-            <span class="color-swatch" style="--color: {{this}}" title="{{this}}"></span>
-          {{/each}}
-        </div>
+        {{#if filament.colorsHex}}
+          <div class="color-swatches">
+            {{#each filament.colorsHex}}
+              <span class="color-variant">
+                {{#if labelKey}}<span class="color-variant__label">{{t labelKey}}</span>{{/if}}
+                {{#each swatches}}
+                  <span class="color-swatch-group">
+                    <span class="color-swatch {{#if glow}}color-swatch--glow{{/if}}" style="--color: {{hex}}" title="{{hex}}"></span>
+                    <span class="color-swatch__hex">{{hex}}</span>
+                    {{#if glow}}<span class="color-tag color-tag--glow">{{t 'color_glow'}}</span>{{/if}}
+                  </span>
+                {{/each}}
+                {{#if transparent}}
+                  <span class="color-tag color-tag--transparent">{{t 'color_transparent'}}</span>
+                {{/if}}
+                {{#if count}}
+                  <span class="color-variant__meta">×{{count}}</span>
+                {{/if}}
+              </span>
+            {{/each}}
+          </div>
+        {{/if}}
       </div>
       <div>
-        <h3>{{t 'net_weight'}}</h3>
-        <p>{{filament.netWeightG}} g</p>
+        <h3>{{t 'net_weight'}} ({{ui.form.units.weight}})</h3>
+        <p>{{formatWeight filament.netWeightG ui.form.units.weight}} {{ui.form.units.weight}}</p>
       </div>
       <div>
-        <h3>{{t 'remaining'}}</h3>
-        <p id="remaining-display" data-remaining="{{formatDecimal filament.remainingG 2}}">{{formatDecimal filament.remainingG 2}} g</p>
+        <h3>{{t 'remaining'}} ({{ui.form.units.weight}})</h3>
+        <p id="remaining-display" data-remaining="{{formatWeight filament.remainingG ui.form.units.weight}}">{{formatWeight filament.remainingG ui.form.units.weight}} {{ui.form.units.weight}}</p>
         <button type="button" class="btn btn--ghost btn--small" data-action="edit-remaining">{{t 'edit_remaining'}}</button>
       </div>
       <div>
-        <h3>{{t 'price_new'}}</h3>
-        <p>{{#if filament.priceNewEUR}}€ {{formatDecimal filament.priceNewEUR 2}}{{/if}}</p>
+        <h3>{{t 'quantity'}}</h3>
+        <p>{{filament.quantity}}</p>
+      </div>
+      <div>
+        <h3>{{t 'price_new'}} ({{ui.form.currency}})</h3>
+        <p>{{#if filament.priceNewEUR}}{{ui.form.currency}} {{formatDecimal filament.priceNewEUR 2}}{{/if}}</p>
       </div>
       <div>
         <h3>{{t 'product_link'}}</h3>

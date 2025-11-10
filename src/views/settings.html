@@ -1,0 +1,68 @@
+<section class="panel">
+  <header class="panel__title">
+    <h1>{{t 'settings_title'}}</h1>
+  </header>
+
+  {{#if saved}}
+    <p class="form__hint">{{t 'settings_saved'}}</p>
+  {{/if}}
+
+  <form method="post" class="form">
+    <fieldset class="settings-section">
+      <legend>{{t 'settings_required_fields'}}</legend>
+      <div class="settings-grid">
+        {{#each requiredFieldDefs}}
+          <label class="checkbox">
+            <input type="checkbox" name="requiredFields[{{this.key}}]" {{#if (lookup ../config.requiredFields this.key)}}checked{{/if}}>
+            <span>{{t this.labelKey}}</span>
+          </label>
+        {{/each}}
+      </div>
+    </fieldset>
+
+    <fieldset class="settings-section">
+      <legend>{{t 'settings_units'}}</legend>
+      <div class="settings-grid settings-grid--small">
+        <label>
+          <span>{{t 'settings_currency'}}</span>
+          <select name="currency">
+            {{#each currencyOptions}}
+              <option value="{{this.value}}" {{#if (eq ../config.currency this.value)}}selected{{/if}}>{{this.label}}</option>
+            {{/each}}
+          </select>
+        </label>
+        <label>
+          <span>{{t 'settings_length_unit'}}</span>
+          <select name="lengthUnit">
+            {{#each lengthOptions}}
+              <option value="{{this.value}}" {{#if (eq ../config.lengthUnit this.value)}}selected{{/if}}>{{this.label}}</option>
+            {{/each}}
+          </select>
+        </label>
+        <label>
+          <span>{{t 'settings_weight_unit'}}</span>
+          <select name="weightUnit">
+            {{#each weightOptions}}
+              <option value="{{this.value}}" {{#if (eq ../config.weightUnit this.value)}}selected{{/if}}>{{this.label}}</option>
+            {{/each}}
+          </select>
+        </label>
+        <label>
+          <span>{{t 'settings_label_barcode_width'}} ({{ui.form.units.length}})</span>
+          <input type="number" step="0.1" min="1" name="labelBarcodeWidth" value="{{ui.form.labelSizes.barcodeWidth}}">
+        </label>
+        <label>
+          <span>{{t 'settings_label_barcode_height'}} ({{ui.form.units.length}})</span>
+          <input type="number" step="0.1" min="1" name="labelBarcodeHeight" value="{{ui.form.labelSizes.barcodeHeight}}">
+        </label>
+        <label>
+          <span>{{t 'settings_label_qr_size'}} ({{ui.form.units.length}})</span>
+          <input type="number" step="0.1" min="1" name="labelQrSize" value="{{ui.form.labelSizes.qrSize}}">
+        </label>
+      </div>
+    </fieldset>
+
+    <button type="submit" class="btn">{{t 'settings_save'}}</button>
+  </form>
+</section>
+

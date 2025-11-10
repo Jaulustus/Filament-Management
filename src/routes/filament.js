@@ -1,6 +1,8 @@
 import { Router } from 'express';
+import PDFDocument from 'pdfkit';
 import { calculateGramsPerMeter } from '../lib/consumption.js';
 import { generateId, sanitizeId } from '../lib/id.js';
+import { parseColorConfig, stringifyColorConfig, buildColorSwatches } from '../lib/colorConfig.js';
 
 const router = Router();
 
@@ -16,33 +18,9 @@ function toNumber(value) {
   return Number.isNaN(num) ? null : num;
 }
 
-function parseColors(value) {
-  if (!value) {
-    return [];
-  }
-  if (Array.isArray(value)) {
-    return value;
-  }
-  if (typeof value === 'string') {
-    try {
-      const parsed = JSON.parse(value);
-      return Array.isArray(parsed) ? parsed : [];
-    } catch (error) {
-      return [];
-    }
-  }
-  return [];
-}
-
-function stringifyColors(colors) {
-  if (!Array.isArray(colors) || colors.length === 0) {
-    return null;
-  }
-  return JSON.stringify(colors);
-}
-
 export function serializeFilament(filament, includeLogs = false) {
-  const colors = parseColors(filament.colorsHex);
+  const colorConfig = parseColorConfig(filament.colorsHex);
+  const colorSwatches = buildColorSwatches(colorConfig);
   const base = {
     id: filament.id,
     name: filament.name,
@@ -53,11 +31,13 @@ export function serializeFilament(filament, includeLogs = false) {
     netWeightG: filament.netWeightG,
     remainingG: toNumber(filament.remainingG),
     gramsPerMeter: toNumber(filament.gramsPerMeter),
-    colorsHex: colors,
+    colorsHex: colorSwatches,
+    colorConfig,
     priceNewEUR: toNumber(filament.priceNewEUR),
     productUrl: filament.productUrl,
     location: filament.location,
     notes: filament.notes,
+    quantity: filament.quantity ?? 1,
     archived: filament.archived,
     createdAt: filament.createdAt,
     updatedAt: filament.updatedAt
@@ -76,19 +56,39 @@ export function serializeFilament(filament, includeLogs = false) {
   return base;
 }
 
-function normaliseColors(body) {
-  if (!body.colorsHex) {
-    return [];
+function normaliseColorConfig(body) {
+  const value = body.colorsHex ?? body.colorConfig ?? body.colors;
+  return parseColorConfig(value);
+}
+
+function hasColorSelection(config) {
+  if (!config) {
+    return false;
   }
-  if (Array.isArray(body.colorsHex)) {
-    return body.colorsHex.filter(Boolean).map((c) => c.trim()).filter((c) => /^#?[0-9A-Fa-f]{6}$/.test(c)).map((c) => (c.startsWith('#') ? c : `#${c}`));
+  if (config.transparent) {
+    return true;
   }
-  return body.colorsHex
-    .split(',')
-    .map((c) => c.trim())
-    .filter(Boolean)
-    .filter((c) => /^#?[0-9A-Fa-f]{6}$/.test(c))
-    .map((c) => (c.startsWith('#') ? c : `#${c}`));
+  if (config.normal?.enabled && config.normal.baseHex) {
+    return true;
+  }
+  if (config.glow?.enabled && config.glow.baseHex) {
+    return true;
+  }
+  if (config.multicolor?.enabled && Array.isArray(config.multicolor.colors) && config.multicolor.colors.length) {
+    return true;
+  }
+  if (config.neon?.enabled && Array.isArray(config.neon.colors) && config.neon.colors.length) {
+    return true;
+  }
+  return false;
+}
+
+function normaliseCount(value) {
+  const num = Number(value);
+  if (!Number.isFinite(num) || num < 0) {
+    return 0;
+  }
+  return Math.round(num);
 }
 
 router.get('/', async (req, res, next) => {
@@ -99,14 +99,58 @@ router.get('/', async (req, res, next) => {
       orderBy: [{ archived: 'asc' }, { name: 'asc' }]
     });
     const filaments = items.map((item) => serializeFilament(item));
-    res.render('index', { filaments, showArchived });
+    const totalQuantity = filaments.reduce((sum, item) => sum + (Number(item.quantity) || 0), 0);
+    res.render('index', { filaments, showArchived, ui: req.app.locals.ui, totalQuantity });
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.get('/inventory', async (req, res, next) => {
+  try {
+    const items = await prisma(req).filament.findMany({
+      where: { archived: false },
+      orderBy: { name: 'asc' }
+    });
+    const filaments = items.map((item) => serializeFilament(item));
+    const totals = {
+      totalExpected: filaments.reduce((sum, item) => sum + (Number(item.quantity) || 0), 0),
+      totalRemaining: filaments.reduce((sum, item) => sum + (Number(item.remainingG) || 0), 0)
+    };
+
+    res.render('inventory', {
+      filaments,
+      totals,
+      ui: req.app.locals.ui
+    });
   } catch (error) {
     next(error);
   }
 });
 
 router.get('/filaments/new', (req, res) => {
-  res.render('filament_new', { defaultId: generateId() });
+  res.render('filament_new', {
+    defaultId: generateId(),
+    formConfig: req.app.locals.ui.form
+  });
+});
+
+router.get('/filaments/:id/edit', async (req, res, next) => {
+  try {
+    const id = sanitizeId(req.params.id);
+    const filament = await prisma(req).filament.findUnique({
+      where: { id }
+    });
+    if (!filament) {
+      return res.status(404).render('filament_view', { notFound: true });
+    }
+    res.render('filament_edit', {
+      filament: serializeFilament(filament),
+      ui: req.app.locals.ui
+    });
+  } catch (error) {
+    next(error);
+  }
 });
 
 router.get('/filaments/:id', async (req, res, next) => {
@@ -119,7 +163,10 @@ router.get('/filaments/:id', async (req, res, next) => {
     if (!filament) {
       return res.status(404).render('filament_view', { notFound: true });
     }
-    res.render('filament_view', { filament: serializeFilament(filament, true) });
+    res.render('filament_view', {
+      filament: serializeFilament(filament, true),
+      ui: req.app.locals.ui
+    });
   } catch (error) {
     next(error);
   }
@@ -134,8 +181,13 @@ router.post('/api/filaments', async (req, res, next) => {
     const netWeightG = Number(data.netWeightG);
     const remainingG = data.remainingG ? Number(data.remainingG) : netWeightG;
     const gramsPerMeter = data.gramsPerMeter ? Number(data.gramsPerMeter) : calculateGramsPerMeter(diameterMm, density);
+    const quantity = Number.isFinite(Number(data.quantity)) ? Math.max(0, Math.floor(Number(data.quantity))) : 1;
 
-    const colors = normaliseColors(data);
+    const colorConfig = normaliseColorConfig(data);
+    const requiresColors = req.app.locals.config?.requiredFields?.colorsHex;
+    if (requiresColors && !hasColorSelection(colorConfig)) {
+      return res.status(400).json({ error: 'colors_required' });
+    }
 
     const created = await prisma(req).filament.create({
       data: {
@@ -148,15 +200,119 @@ router.post('/api/filaments', async (req, res, next) => {
         netWeightG,
         remainingG,
         gramsPerMeter,
-        colorsHex: stringifyColors(colors),
+        colorsHex: stringifyColorConfig(colorConfig),
         priceNewEUR: data.priceNewEUR ? Number(data.priceNewEUR) : null,
         productUrl: data.productUrl || null,
         location: data.location || null,
-        notes: data.notes || null
+        notes: data.notes || null,
+        quantity
       }
     });
 
     res.status(201).json({ filament: serializeFilament(created) });
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.post('/inventory/export', async (req, res, next) => {
+  try {
+    const countsInput = req.body?.counts && typeof req.body.counts === 'object' ? req.body.counts : {};
+    const items = await prisma(req).filament.findMany({
+      where: { archived: false },
+      orderBy: { name: 'asc' }
+    });
+    const filaments = items.map((item) => serializeFilament(item));
+
+    const doc = new PDFDocument({ size: 'A4', margin: 40 });
+    const now = new Date();
+    const filename = `inventur_${now.toISOString().slice(0, 10)}.pdf`;
+
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+
+    doc.pipe(res);
+
+    doc.fontSize(18).text('Inventurbericht', { align: 'center' });
+    doc.moveDown(0.5);
+    doc.fontSize(10).text(`Erstellt am: ${now.toLocaleString('de-DE')}`);
+    doc.moveDown();
+
+    const columns = [
+      { key: 'name', label: 'Name', width: 170, align: 'left' },
+      { key: 'manufacturer', label: 'Hersteller', width: 90, align: 'left' },
+      { key: 'expected', label: 'Erwartet', width: 60, align: 'right' },
+      { key: 'counted', label: 'Gezählt', width: 60, align: 'right' },
+      { key: 'difference', label: 'Differenz', width: 60, align: 'right' },
+      { key: 'remaining', label: 'Rest (g)', width: 70, align: 'right' }
+    ];
+
+    function drawRow(values, isHeader = false) {
+      const startX = doc.x;
+      const startY = doc.y;
+      let x = startX;
+      columns.forEach((column, index) => {
+        const value = values[index] ?? '';
+        doc.font(isHeader ? 'Helvetica-Bold' : 'Helvetica');
+        doc.text(value, x, startY, {
+          width: column.width,
+          align: column.align
+        });
+        x += column.width;
+      });
+      doc.x = startX;
+      doc.moveDown(isHeader ? 1 : 0.7);
+    }
+
+    drawRow(columns.map((c) => c.label), true);
+
+    let expectedTotal = 0;
+    let countedTotal = 0;
+    let remainingTotal = 0;
+
+    const pageBottom = () => doc.page.height - doc.page.margins.bottom - 40;
+
+    filaments.forEach((filament) => {
+      const expected = Number(filament.quantity) || 0;
+      const counted = normaliseCount(countsInput[filament.id] ?? expected);
+      const difference = counted - expected;
+      const remaining = Number(filament.remainingG) || 0;
+
+      expectedTotal += expected;
+      countedTotal += counted;
+      remainingTotal += remaining;
+
+      if (doc.y > pageBottom()) {
+        doc.addPage();
+        drawRow(columns.map((c) => c.label), true);
+      }
+
+      const rowValues = [
+        filament.name,
+        filament.manufacturer || '',
+        expected.toString(),
+        counted.toString(),
+        difference > 0 ? `+${difference}` : difference.toString(),
+        remaining.toFixed(2)
+      ];
+      drawRow(rowValues);
+    });
+
+    if (!filaments.length) {
+      doc.text('Keine Filamente vorhanden.', { align: 'center' });
+    }
+
+    doc.moveDown();
+    doc.font('Helvetica-Bold').fontSize(12).text('Summen');
+    doc.moveDown(0.4);
+    doc.font('Helvetica').fontSize(11);
+    doc.text(`Summe erwartet: ${expectedTotal}`);
+    doc.text(`Summe gezählt: ${countedTotal}`);
+    const diffTotal = countedTotal - expectedTotal;
+    doc.text(`Summe Differenz: ${diffTotal > 0 ? `+${diffTotal}` : diffTotal}`);
+    doc.text(`Gesamtgewicht (g): ${Number(remainingTotal.toFixed(2))}`);
+
+    doc.end();
   } catch (error) {
     next(error);
   }
@@ -218,6 +374,73 @@ router.post('/api/filaments/:id/consume', async (req, res, next) => {
   }
 });
 
+router.put('/api/filaments/:id', async (req, res, next) => {
+  try {
+    const id = sanitizeId(req.params.id);
+    const existing = await prisma(req).filament.findUnique({ where: { id } });
+    if (!existing) {
+      return res.status(404).json({ error: 'not_found' });
+    }
+
+    const payload = req.body || {};
+    const data = {};
+
+    if (Object.prototype.hasOwnProperty.call(payload, 'priceNewEUR')) {
+      if (payload.priceNewEUR === null || payload.priceNewEUR === '') {
+        data.priceNewEUR = null;
+      } else {
+        const price = Number(payload.priceNewEUR);
+        if (Number.isFinite(price)) {
+          data.priceNewEUR = price;
+        }
+      }
+    }
+    if (Object.prototype.hasOwnProperty.call(payload, 'netWeightG')) {
+      const netWeight = Number(payload.netWeightG);
+      if (Number.isFinite(netWeight) && netWeight >= 0) {
+        data.netWeightG = netWeight;
+      }
+    }
+    if (Object.prototype.hasOwnProperty.call(payload, 'remainingG')) {
+      const remaining = Number(payload.remainingG);
+      if (Number.isFinite(remaining) && remaining >= 0) {
+        data.remainingG = remaining;
+      }
+    }
+    if (Object.prototype.hasOwnProperty.call(payload, 'notes')) {
+      const trimmed = payload.notes?.toString().trim();
+      data.notes = trimmed ? trimmed : null;
+    }
+    if (Object.prototype.hasOwnProperty.call(payload, 'quantity')) {
+      const qty = Number(payload.quantity);
+      if (Number.isFinite(qty) && qty >= 0) {
+        data.quantity = Math.floor(qty);
+      }
+    }
+    if (Object.prototype.hasOwnProperty.call(payload, 'colorsHex')) {
+      const colorConfig = normaliseColorConfig(payload);
+      const requiresColors = req.app.locals.config?.requiredFields?.colorsHex;
+      if (requiresColors && !hasColorSelection(colorConfig)) {
+        return res.status(400).json({ error: 'colors_required' });
+      }
+      data.colorsHex = stringifyColorConfig(colorConfig);
+    }
+
+    if (!Object.keys(data).length) {
+      return res.json({ filament: serializeFilament(existing) });
+    }
+
+    const updated = await prisma(req).filament.update({
+      where: { id },
+      data
+    });
+
+    res.json({ filament: serializeFilament(updated) });
+  } catch (error) {
+    next(error);
+  }
+});
+
 router.post('/api/filaments/:id/remaining', async (req, res, next) => {
   try {
     const id = sanitizeId(req.params.id);
@@ -265,6 +488,7 @@ router.post('/api/filaments/:id/duplicate', async (req, res, next) => {
         productUrl: original.productUrl,
         location: original.location,
         notes: original.notes,
+        quantity: original.quantity,
         archived: false
       }
     });
@@ -331,6 +555,20 @@ router.post('/api/filaments/:id/unarchive', async (req, res, next) => {
       data: { archived: false }
     });
     res.json({ filament: serializeFilament(filament) });
+  } catch (error) {
+    if (error.code === 'P2025') {
+      return res.status(404).json({ error: 'not_found' });
+    }
+    next(error);
+  }
+});
+
+router.delete('/api/filaments/:id', async (req, res, next) => {
+  try {
+    const id = sanitizeId(req.params.id);
+    await prisma(req).usageLog.deleteMany({ where: { filamentId: id } });
+    await prisma(req).filament.delete({ where: { id } });
+    res.status(204).end();
   } catch (error) {
     if (error.code === 'P2025') {
       return res.status(404).json({ error: 'not_found' });

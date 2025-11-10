@@ -1,19 +1,12 @@
-export function buildLabelData(filament, { barcodeUrl, qrUrl }) {
+import { parseColorConfig, buildColorSwatches } from './colorConfig.js';
+
+export function buildLabelData(filament, { barcodeUrl, qrUrl, dimensions }) {
   if (!filament) {
     return null;
   }
 
-  let colors = [];
-  if (Array.isArray(filament.colorsHex)) {
-    colors = filament.colorsHex;
-  } else if (typeof filament.colorsHex === 'string') {
-    try {
-      const parsed = JSON.parse(filament.colorsHex);
-      colors = Array.isArray(parsed) ? parsed : [];
-    } catch (error) {
-      colors = [];
-    }
-  }
+  const colorConfig = parseColorConfig(filament.colorsHex);
+  const colors = buildColorSwatches(colorConfig);
 
   return {
     id: filament.id,
@@ -25,7 +18,13 @@ export function buildLabelData(filament, { barcodeUrl, qrUrl }) {
     netWeightG: filament.netWeightG,
     remainingG: Number(filament.remainingG),
     barcodeUrl,
-    qrUrl
+    qrUrl,
+    barcodeWidthPx: dimensions?.barcodeWidthPx,
+    barcodeHeightPx: dimensions?.barcodeHeightPx,
+    barcodeWidthMm: dimensions?.barcodeWidthMm,
+    barcodeHeightMm: dimensions?.barcodeHeightMm,
+    qrSizePx: dimensions?.qrSizePx,
+    qrSizeMm: dimensions?.qrSizeMm
   };
 }
 

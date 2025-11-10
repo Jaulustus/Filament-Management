@@ -5,6 +5,10 @@
       <input id="show-archived" type="checkbox" {{#if showArchived}}checked{{/if}}>
       <span>{{t 'show_archived'}}</span>
     </label>
+    <div class="total-quantity">
+      <span class="total-quantity__label">{{t 'total_quantity'}}</span>
+      <span class="total-quantity__value" id="total-quantity-value">{{totalQuantity}}</span>
+    </div>
   </div>
 
   <div class="table-wrapper">
@@ -13,10 +17,11 @@
         <tr>
           <th>{{t 'name'}}</th>
           <th>{{t 'material'}}</th>
-          <th>{{t 'diameter'}}</th>
+          <th>{{t 'diameter'}} ({{ui.form.units.length}})</th>
           <th>{{t 'colors'}}</th>
-          <th>{{t 'net_weight'}}</th>
-          <th>{{t 'remaining'}}</th>
+          <th>{{t 'net_weight'}} ({{ui.form.units.weight}})</th>
+          <th>{{t 'remaining'}} ({{ui.form.units.weight}})</th>
+          <th>{{t 'quantity'}}</th>
           <th>{{t 'id_number'}}</th>
           <th>{{t 'price_new'}}</th>
           <th>{{t 'product_link'}}</th>
@@ -28,18 +33,30 @@
           <tr data-id="{{id}}" class="{{#if archived}}archived{{/if}}">
             <td><a href="/filaments/{{id}}">{{name}}</a></td>
             <td>{{material}}</td>
-            <td>{{formatDecimal diameterMm 2}}</td>
+            <td>{{formatLength diameterMm ../ui.form.units.length}}</td>
             <td>
               {{#if colorsHex}}
                 <div class="color-swatches">
                   {{#each colorsHex}}
-                    <span class="color-swatch" style="--color: {{this}}" title="{{this}}"></span>
+                    <span class="color-variant">
+                      {{#if labelKey}}<span class="color-variant__label">{{t labelKey}}</span>{{/if}}
+                      {{#each swatches}}
+                        <span class="color-swatch {{#if glow}}color-swatch--glow{{/if}}" style="--color: {{hex}}" title="{{hex}}"></span>
+                      {{/each}}
+                      {{#if transparent}}
+                        <span class="color-tag color-tag--transparent">{{t 'color_transparent'}}</span>
+                      {{/if}}
+                      {{#if count}}
+                        <span class="color-variant__meta">×{{count}}</span>
+                      {{/if}}
+                    </span>
                   {{/each}}
                 </div>
               {{/if}}
             </td>
-            <td>{{netWeightG}} g</td>
-            <td data-remaining>{{formatDecimal remainingG 2}} g</td>
+            <td>{{formatWeight netWeightG ../ui.form.units.weight}} {{../ui.form.units.weight}}</td>
+            <td data-remaining>{{formatWeight remainingG ../ui.form.units.weight}} {{../ui.form.units.weight}}</td>
+            <td>{{quantity}}</td>
             <td>
               <div class="id-block">
                 <span class="id-text">{{id}}</span>
@@ -49,7 +66,7 @@
                 </div>
               </div>
             </td>
-            <td>{{#if priceNewEUR}}€ {{formatDecimal priceNewEUR 2}}{{/if}}</td>
+            <td>{{#if priceNewEUR}}{{../ui.form.currency}} {{formatDecimal priceNewEUR 2}}{{/if}}</td>
             <td>{{#if productUrl}}<a href="{{productUrl}}" target="_blank" rel="noopener">Link</a>{{/if}}</td>
             <td>
               <button class="btn" data-action="restock">{{t 'restock'}}</button>
@@ -59,6 +76,7 @@
               {{else}}
                 <button class="btn btn--danger" data-action="archive">{{t 'archive'}}</button>
               {{/if}}
+              <button class="btn btn--danger" data-action="delete">{{t 'delete'}}</button>
             </td>
           </tr>
         {{/each}}

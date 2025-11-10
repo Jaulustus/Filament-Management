@@ -1,0 +1,16 @@
+{
+  "currency": "EUR",
+  "lengthUnit": "mm",
+  "weightUnit": "g",
+  "requiredFields": {
+    "name": true,
+    "manufacturer": true,
+    "material": true,
+    "diameterMm": true,
+    "netWeightG": true,
+    "remainingG": true,
+    "priceNewEUR": false,
+    "productUrl": false,
+    "notes": false
+  }
+}

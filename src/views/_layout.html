@@ -6,7 +6,7 @@
   <title>{{t 'app_title'}}</title>
   <link rel="stylesheet" href="/styles.css">
 </head>
-<body data-lang="{{lang}}">
+<body data-lang="{{lang}}" data-length-unit="{{ui.form.units.length}}" data-weight-unit="{{ui.form.units.weight}}" data-currency="{{ui.form.currency}}">
   <header class="topbar">
     <div class="topbar__title">
       <a href="/">{{t 'app_title'}}</a>
@@ -14,7 +14,9 @@
     <nav class="topbar__nav">
       <a href="/">{{t 'menu_home'}}</a>
       <a href="/filaments/new">{{t 'menu_new'}}</a>
+      <a href="/inventory">{{t 'menu_inventory'}}</a>
       <a href="/upload-gcode">{{t 'menu_upload'}}</a>
+      <a href="/settings">{{t 'menu_settings'}}</a>
     </nav>
     <div class="topbar__actions">
       <div class="topbar__language">

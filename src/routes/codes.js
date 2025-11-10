@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import bwipjs from 'bwip-js';
 import QRCode from 'qrcode';
+import createDrawingSvg from '../lib/drawingSvg.js';
 
 const router = Router();
 
@@ -31,18 +32,19 @@ router.get('/api/codes/barcode.svg', async (req, res, next) => {
     return res.status(400).send('id required');
   }
   try {
-    const svg = await bwipjs.toBuffer({
+    const opts = {
       bcid: 'code128',
       text: id,
       includetext: true,
       textxalign: 'center',
       textsize: 10,
-      scale: 3,
-      height: 12,
       paddingwidth: 10,
       paddingheight: 10,
-      svg: true
-    });
+      backgroundcolor: 'FFFFFF'
+    };
+
+    bwipjs.fixupOptions(opts);
+    const svg = bwipjs.render(opts, createDrawingSvg(opts, bwipjs.FontLib));
     res.type('image/svg+xml').send(svg);
   } catch (error) {
     next(error);

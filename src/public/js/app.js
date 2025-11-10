@@ -1,5 +1,8 @@
 const T = window.__T__ || {};
 const LANG = window.__LANG__ || 'de';
+const UNIT_LENGTH = document.body?.dataset?.lengthUnit || 'mm';
+const UNIT_WEIGHT = document.body?.dataset?.weightUnit || 'g';
+const CURRENCY = document.body?.dataset?.currency || 'EUR';
 
 function t(key) {
   return T[key] || key;
@@ -13,12 +16,243 @@ function ready(fn) {
   }
 }
 
-ready(() => {
-  initListPage();
-  initCreateForm();
-  initDetailPage();
-  initGcodePage();
-});
+const COLOR_PALETTE = [
+  { hex: '#ffffff', name: 'Weiß' },
+  { hex: '#f0f0f0', name: 'Hellgrau' },
+  { hex: '#c0c0c0', name: 'Silber' },
+  { hex: '#000000', name: 'Schwarz' },
+  { hex: '#ff0000', name: 'Rot' },
+  { hex: '#ff7f00', name: 'Orange' },
+  { hex: '#ffff00', name: 'Gelb' },
+  { hex: '#00ff00', name: 'Grün' },
+  { hex: '#00ffff', name: 'Cyan' },
+  { hex: '#0000ff', name: 'Blau' },
+  { hex: '#8000ff', name: 'Violett' },
+  { hex: '#ff00ff', name: 'Magenta' },
+  { hex: '#8b4513', name: 'Braun' },
+  { hex: '#ffb347', name: 'Apricot' },
+  { hex: '#ffd1dc', name: 'Pastell Rosa' }
+];
+
+const NEON_COLORS = [
+  { hex: '#ff073a', name: 'Neon Rot' },
+  { hex: '#ff1493', name: 'Neon Pink' },
+  { hex: '#39ff14', name: 'Neon Grün' },
+  { hex: '#ffff33', name: 'Neon Gelb' },
+  { hex: '#ff5f1f', name: 'Neon Orange' },
+  { hex: '#7df9ff', name: 'Neon Türkis' },
+  { hex: '#9400d3', name: 'Neon Violett' }
+];
+
+function sanitizeHex(value) {
+  if (!value) {
+    return '';
+  }
+  let hex = value.toString().trim();
+  if (!hex) {
+    return '';
+  }
+  if (!hex.startsWith('#')) {
+    hex = `#${hex}`;
+  }
+  if (/^#[0-9a-fA-F]{3}$/.test(hex)) {
+    hex = `#${hex[1]}${hex[1]}${hex[2]}${hex[2]}${hex[3]}${hex[3]}`;
+  }
+  if (!/^#[0-9a-fA-F]{6}$/.test(hex)) {
+    return '';
+  }
+  return hex.toLowerCase();
+}
+
+function getContrastColor(hex) {
+  const sanitized = sanitizeHex(hex).replace('#', '');
+  const r = parseInt(sanitized.slice(0, 2), 16);
+  const g = parseInt(sanitized.slice(2, 4), 16);
+  const b = parseInt(sanitized.slice(4, 6), 16);
+  const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+  return luminance > 0.6 ? '#111111' : '#ffffff';
+}
+
+function normaliseColorConfig(config) {
+  const base = {
+    transparent: Boolean(config?.transparent),
+    normal: {
+      enabled: Boolean(config?.normal?.enabled),
+      baseHex: sanitizeHex(config?.normal?.baseHex)
+    },
+    glow: {
+      enabled: Boolean(config?.glow?.enabled),
+      baseHex: sanitizeHex(config?.glow?.baseHex),
+      glowHex: sanitizeHex(config?.glow?.glowHex)
+    },
+    multicolor: {
+      enabled: Boolean(config?.multicolor?.enabled),
+      colors: Array.isArray(config?.multicolor?.colors)
+        ? config.multicolor.colors.map((hex) => sanitizeHex(hex)).filter(Boolean)
+        : []
+    },
+    neon: {
+      enabled: Boolean(config?.neon?.enabled),
+      colors: Array.isArray(config?.neon?.colors)
+        ? config.neon.colors.map((hex) => sanitizeHex(hex)).filter(Boolean)
+        : []
+    }
+  };
+
+  if (!base.glow.glowHex || base.glow.glowHex === base.glow.baseHex) {
+    base.glow.glowHex = '';
+  }
+
+  if (!base.normal.baseHex) {
+    base.normal.enabled = false;
+  }
+  if (!base.glow.baseHex) {
+    base.glow.enabled = false;
+  }
+  if (!base.multicolor.colors.length) {
+    base.multicolor.enabled = false;
+  }
+  if (!base.neon.colors.length) {
+    base.neon.enabled = false;
+  }
+
+  return base;
+}
+
+function buildColorSwatchesFromConfig(config) {
+  const normalised = normaliseColorConfig(config);
+  const entries = [];
+
+  if (normalised.normal.enabled && normalised.normal.baseHex) {
+    entries.push({
+      type: 'normal',
+      labelKey: 'color_option_normal',
+      swatches: [{ hex: normalised.normal.baseHex, glow: false }],
+      transparent: normalised.transparent === true
+    });
+  }
+
+  if (normalised.glow.enabled && normalised.glow.baseHex) {
+    const swatches = [{ hex: normalised.glow.baseHex, glow: false }];
+    if (normalised.glow.glowHex) {
+      swatches.push({ hex: normalised.glow.glowHex, glow: true });
+    }
+    entries.push({
+      type: 'glow',
+      labelKey: 'color_option_glow',
+      swatches,
+      transparent: normalised.transparent === true
+    });
+  }
+
+  if (normalised.multicolor.enabled && normalised.multicolor.colors.length) {
+    entries.push({
+      type: 'multicolor',
+      labelKey: 'color_option_multicolor',
+      swatches: normalised.multicolor.colors.map((hex) => ({ hex, glow: false })),
+      count: normalised.multicolor.colors.length,
+      transparent: normalised.transparent === true
+    });
+  }
+
+  if (normalised.neon.enabled && normalised.neon.colors.length) {
+    entries.push({
+      type: 'neon',
+      labelKey: 'color_option_neon',
+      swatches: normalised.neon.colors.map((hex) => ({ hex, glow: true })),
+      count: normalised.neon.colors.length,
+      transparent: false
+    });
+  }
+
+  if (!entries.length && normalised.transparent) {
+    entries.push({
+      type: 'transparent',
+      labelKey: 'color_option_transparent',
+      swatches: [],
+      transparent: true
+    });
+  }
+
+  return entries;
+}
+
+function hasSelectedColors(config) {
+  const normalised = normaliseColorConfig(config);
+  if (normalised.transparent) {
+    return true;
+  }
+  if (normalised.normal.enabled && normalised.normal.baseHex) {
+    return true;
+  }
+  if (normalised.glow.enabled && normalised.glow.baseHex) {
+    return true;
+  }
+  if (normalised.multicolor.enabled && normalised.multicolor.colors.length) {
+    return true;
+  }
+  if (normalised.neon.enabled && normalised.neon.colors.length) {
+    return true;
+  }
+  return false;
+}
+
+function renderColorVariants(variants = []) {
+  if (!Array.isArray(variants) || variants.length === 0) {
+    return '';
+  }
+  return `<div class="color-swatches">${variants
+    .map((variant) => {
+      if (!variant) {
+        return '';
+      }
+      const label = variant.labelKey ? `<span class="color-variant__label">${t(variant.labelKey)}</span>` : '';
+      const swatches = Array.isArray(variant.swatches)
+        ? variant.swatches
+            .map((swatch) => {
+              if (!swatch || !swatch.hex) {
+                return '';
+              }
+              const glowTag = swatch.glow ? `<span class="color-tag color-tag--glow">${t('color_glow')}</span>` : '';
+              return `<span class="color-swatch-group"><span class="color-swatch ${swatch.glow ? 'color-swatch--glow' : ''}" style="--color: ${
+                swatch.hex
+              }" title="${swatch.hex}"></span><span class="color-swatch__hex">${swatch.hex}</span>${glowTag}</span>`;
+            })
+            .join('')
+        : '';
+      const transparent = variant.transparent
+        ? `<span class="color-tag color-tag--transparent">${t('color_transparent')}</span>`
+        : '';
+      const count = variant.count ? `<span class="color-variant__meta">×${variant.count}</span>` : '';
+      return `<span class="color-variant">${label}${swatches}${transparent}${count}</span>`;
+    })
+    .join('')}</div>`;
+}
+
+function formatLengthValue(value) {
+  const num = Number(value);
+  if (!Number.isFinite(num)) {
+    return value;
+  }
+  if (UNIT_LENGTH === 'inch') {
+    return (num / 25.4).toFixed(3);
+  }
+  return num.toFixed(2);
+}
+
+function formatWeightValue(value) {
+  const num = Number(value);
+  if (!Number.isFinite(num)) {
+    return value;
+  }
+  if (UNIT_WEIGHT === 'oz') {
+    return (num / 28.349523125).toFixed(2);
+  }
+  if (UNIT_WEIGHT === 'lb') {
+    return (num / 453.59237).toFixed(2);
+  }
+  return num.toFixed(0);
+}
 
 function initListPage() {
   const table = document.getElementById('filament-table');
@@ -52,19 +286,24 @@ function initListPage() {
 
   function renderRows() {
     tbody.innerHTML = '';
+    let totalQty = 0;
     currentData.forEach((filament) => {
       const row = document.createElement('tr');
       row.dataset.id = filament.id;
       if (filament.archived) {
         row.classList.add('archived');
       }
+      const colorMarkup = renderColorVariants(filament.colorsHex);
+      const quantity = Number(filament.quantity) || 0;
+      totalQty += quantity;
       row.innerHTML = `
         <td><a href="/filaments/${filament.id}">${filament.name}</a></td>
         <td>${filament.material || ''}</td>
-        <td>${formatDecimal(filament.diameterMm, 2)}</td>
-        <td>${renderColors(filament.colorsHex)}</td>
-        <td>${filament.netWeightG} g</td>
-        <td data-remaining>${formatDecimal(filament.remainingG, 2)} g</td>
+        <td>${formatLengthValue(filament.diameterMm)} ${UNIT_LENGTH}</td>
+        <td>${colorMarkup}</td>
+        <td>${formatWeightValue(filament.netWeightG)} ${UNIT_WEIGHT}</td>
+        <td data-remaining>${formatWeightValue(filament.remainingG)} ${UNIT_WEIGHT}</td>
+        <td>${quantity}</td>
         <td>
           <div class="id-block">
             <span class="id-text">${filament.id}</span>
@@ -74,7 +313,7 @@ function initListPage() {
             </div>
           </div>
         </td>
-        <td>${filament.priceNewEUR ? `€ ${formatDecimal(filament.priceNewEUR, 2)}` : ''}</td>
+        <td>${filament.priceNewEUR ? `${CURRENCY} ${formatDecimal(filament.priceNewEUR, 2)}` : ''}</td>
         <td>${filament.productUrl ? `<a href="${filament.productUrl}" target="_blank" rel="noopener">Link</a>` : ''}</td>
         <td>
           <button class="btn" data-action="restock">${t('restock')}</button>
@@ -82,19 +321,15 @@ function initListPage() {
           ${filament.archived
             ? `<button class="btn" data-action="unarchive">${t('unarchive')}</button>`
             : `<button class="btn btn--danger" data-action="archive">${t('archive')}</button>`}
+          <button class="btn btn--danger" data-action="delete">${t('delete')}</button>
         </td>
       `;
       tbody.appendChild(row);
     });
-  }
-
-  function renderColors(colors = []) {
-    if (!Array.isArray(colors) || colors.length === 0) {
-      return '';
+    const totalEl = document.getElementById('total-quantity-value');
+    if (totalEl) {
+      totalEl.textContent = totalQty;
     }
-    return `<div class="color-swatches">${colors
-      .map((c) => `<span class="color-swatch" style="--color: ${c}" title="${c}"></span>`)
-      .join('')}</div>`;
   }
 
   function formatDecimal(value, decimals = 2) {
@@ -127,10 +362,640 @@ function initListPage() {
     } else if (action === 'archive' || action === 'unarchive') {
       await fetch(`/api/filaments/${id}/${action}`, { method: 'POST' });
       await fetchData();
+    } else if (action === 'delete') {
+      if (!confirm(t('confirm_delete'))) {
+        return;
+      }
+      button.disabled = true;
+      try {
+        const res = await fetch(`/api/filaments/${id}`, { method: 'DELETE' });
+        if (!res.ok) {
+          throw new Error(`Delete failed: ${res.status}`);
+        }
+        await fetchData();
+      } catch (error) {
+        console.error(error);
+        alert(t('delete_failed'));
+      } finally {
+        button.disabled = false;
+      }
     }
   });
 
   fetchData().catch(console.error);
+}
+
+function renderPalette(container, onSelect, isEnabled = () => true) {
+  if (!container) {
+    return;
+  }
+  container.innerHTML = '';
+  COLOR_PALETTE.forEach(({ hex, name }) => {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'color-swatch-btn';
+    btn.style.setProperty('--swatch-color', hex);
+    btn.title = name;
+    btn.addEventListener('click', () => {
+      if (!isEnabled()) {
+        return;
+      }
+      onSelect(hex);
+    });
+    container.append(btn);
+  });
+}
+
+function setupColorControls(form, initialConfig = {}, onChange) {
+  if (!form) {
+    const fallback = normaliseColorConfig(initialConfig);
+    return {
+      colorConfig: fallback,
+      getConfig: () => normaliseColorConfig(fallback),
+      updatePreview: () => {}
+    };
+  }
+
+  const changeCallback = typeof onChange === 'function' ? onChange : null;
+
+  const colorConfig = normaliseColorConfig(initialConfig);
+  const select = (selector) => form.querySelector(selector);
+
+  const colorOptions = {
+    normal: select('#color-option-normal'),
+    glow: select('#color-option-glow'),
+    multicolor: select('#color-option-multicolor'),
+    neon: select('#color-option-neon'),
+    transparent: select('#color-option-transparent')
+  };
+
+  const hasControls = Object.values(colorOptions).some(Boolean);
+  if (!hasControls) {
+    return {
+      colorConfig,
+      getConfig: () => normaliseColorConfig(colorConfig),
+      updatePreview: () => {}
+    };
+  }
+
+  const panels = {
+    normal: select('#color-panel-normal'),
+    glow: select('#color-panel-glow'),
+    multicolor: select('#color-panel-multicolor'),
+    neon: select('#color-panel-neon')
+  };
+
+  Object.entries(panels).forEach(([key, panel]) => {
+    panel?.addEventListener('mousedown', () => {
+      const checkbox = colorOptions[key];
+      if (checkbox && !checkbox.checked) {
+        checkbox.checked = true;
+        colorConfig[key] = colorConfig[key] || {};
+        colorConfig[key].enabled = true;
+        updatePanelVisibility();
+      }
+    });
+  });
+
+  const inputs = {
+    normalText: select('#normal-hex-text'),
+    normalColor: select('#normal-hex-color'),
+    glowBaseText: select('#glow-base-text'),
+    glowBaseColor: select('#glow-base-color'),
+    glowHexText: select('#glow-hex-text'),
+    glowHexColor: select('#glow-hex-color'),
+    multicolorCount: select('#multicolor-count'),
+    multicolorInputs: select('#multicolor-inputs'),
+    neonPalette: select('#neon-palette'),
+    previewWrapper: select('#color-preview'),
+    previewList: select('#color-preview-list')
+  };
+
+  const paletteContainers = {
+    normal: select('#normal-palette'),
+    glowBase: select('#glow-base-palette'),
+    glowGlow: select('#glow-glow-palette')
+  };
+
+  const DEFAULT_NORMAL = '#ff6600';
+  const DEFAULT_GLOW_BASE = '#2f2f2f';
+  const DEFAULT_GLOW_GLOW = '#39ff14';
+
+  function updatePreview() {
+    if (!inputs.previewWrapper || !inputs.previewList) {
+      return;
+    }
+    const swatches = buildColorSwatchesFromConfig(colorConfig);
+    if (!swatches.length) {
+      inputs.previewWrapper.hidden = true;
+      inputs.previewList.innerHTML = '';
+    } else {
+      inputs.previewWrapper.hidden = false;
+      inputs.previewList.innerHTML = renderColorVariants(swatches);
+    }
+    if (changeCallback) {
+      changeCallback(normaliseColorConfig(colorConfig));
+    }
+  }
+
+  function updatePanelVisibility() {
+    let visiblePanel = false;
+    ['normal', 'glow', 'multicolor', 'neon'].forEach((key) => {
+      const checkbox = colorOptions[key];
+      const panel = panels[key];
+      if (!checkbox || !panel) {
+        return;
+      }
+      const enabled = checkbox.checked;
+      colorConfig[key] = colorConfig[key] || {};
+      colorConfig[key].enabled = enabled;
+      panel.hidden = !enabled;
+      if (enabled) {
+        visiblePanel = true;
+      }
+    });
+    if (inputs.previewWrapper) {
+      inputs.previewWrapper.hidden = !visiblePanel;
+    }
+    updatePreview();
+  }
+
+  function attachHexSync(textInput, colorInput, setter, defaultHex = '#ffffff') {
+    let current = sanitizeHex(colorInput?.value) || sanitizeHex(textInput?.value) || defaultHex;
+    if (colorInput) {
+      colorInput.value = current;
+    }
+    if (textInput) {
+      textInput.value = current;
+    }
+    setter(current);
+
+    const apply = (hex) => {
+      if (hex) {
+        current = hex;
+        setter(hex);
+      }
+      updatePreview();
+    };
+
+    if (colorInput) {
+      colorInput.addEventListener('input', () => {
+        const hex = sanitizeHex(colorInput.value);
+        if (hex) {
+          if (textInput) {
+            textInput.value = hex;
+          }
+          apply(hex);
+        } else {
+          colorInput.value = current;
+        }
+      });
+    }
+
+    if (textInput) {
+      const handleText = () => {
+        const hex = sanitizeHex(textInput.value);
+        if (hex) {
+          if (colorInput) {
+            colorInput.value = hex;
+          }
+          apply(hex);
+        } else {
+          textInput.value = current;
+          updatePreview();
+        }
+      };
+      textInput.addEventListener('change', handleText);
+      textInput.addEventListener('blur', handleText);
+    }
+
+    updatePreview();
+
+    return (hex) => {
+      const sanitized = sanitizeHex(hex);
+      if (!sanitized) {
+        return;
+      }
+      current = sanitized;
+      if (colorInput) {
+        colorInput.value = sanitized;
+      }
+      if (textInput) {
+        textInput.value = sanitized;
+      }
+      setter(sanitized);
+      updatePreview();
+    };
+  }
+
+  function ensureMulticolorColors(count) {
+    const defaults = ['#ff6b6b', '#ffd93d', '#6bc2ff', '#a16eff', '#4ade80', '#f97316', '#facc15'];
+    const currentColors = colorConfig.multicolor.colors || [];
+    const result = Array.from({ length: count }, (_, index) => currentColors[index] || defaults[index % defaults.length]);
+    colorConfig.multicolor.colors = result.map((hex, index) => sanitizeHex(hex) || defaults[index % defaults.length]);
+  }
+
+  function renderMulticolorInputs() {
+    if (!inputs.multicolorInputs) {
+      return;
+    }
+    const colors = colorConfig.multicolor.colors || [];
+    inputs.multicolorInputs.innerHTML = '';
+    colors.forEach((hex, index) => {
+      const row = document.createElement('div');
+      row.className = 'color-multicolor-row';
+
+      const textLabel = document.createElement('label');
+      const textSpan = document.createElement('span');
+      textSpan.textContent = `${t('color_hex')} ${index + 1}`;
+      const textInput = document.createElement('input');
+      textInput.type = 'text';
+      textInput.className = 'hex-input';
+      textInput.value = hex || '';
+      textLabel.append(textSpan, textInput);
+
+      const colorLabel = document.createElement('label');
+      const colorSpan = document.createElement('span');
+      colorSpan.textContent = t('color_base');
+      const colorInput = document.createElement('input');
+      colorInput.type = 'color';
+      colorInput.value = hex || '#ffffff';
+      colorLabel.append(colorSpan, colorInput);
+
+      const setHex = attachHexSync(textInput, colorInput, (value) => {
+        colorConfig.multicolor.colors[index] = value;
+      }, hex || '#ffffff');
+
+      const palette = document.createElement('div');
+      palette.className = 'color-palette color-palette--compact';
+      renderPalette(palette, (value) => {
+        setHex(value);
+      }, () => colorOptions.multicolor?.checked);
+
+      row.append(textLabel, colorLabel, palette);
+      inputs.multicolorInputs.append(row);
+    });
+  }
+
+  function renderNeonPalette() {
+    if (!inputs.neonPalette) {
+      return;
+    }
+    inputs.neonPalette.innerHTML = '';
+    NEON_COLORS.forEach(({ hex, name }) => {
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.className = 'color-neon-option';
+      button.dataset.hex = hex;
+      const contrast = getContrastColor(hex);
+      button.style.setProperty('--neon-bg', hex);
+      button.style.setProperty('--neon-text', contrast);
+      button.style.background = hex;
+      button.style.backgroundColor = hex;
+      button.style.color = contrast;
+      button.style.borderColor = hex;
+      button.style.boxShadow = `0 0 12px ${hex}66`;
+      if (colorConfig.neon.colors.includes(hex)) {
+        button.classList.add('selected');
+      }
+      const swatch = document.createElement('span');
+      swatch.className = 'color-neon-swatch';
+      swatch.style.backgroundColor = hex;
+      swatch.style.boxShadow = `0 0 10px ${hex}`;
+      const label = document.createElement('span');
+      label.textContent = name;
+      button.append(swatch, label);
+      button.addEventListener('click', () => {
+        if (!colorOptions.neon?.checked) {
+          return;
+        }
+        const idx = colorConfig.neon.colors.indexOf(hex);
+        if (idx >= 0) {
+          colorConfig.neon.colors.splice(idx, 1);
+          button.classList.remove('selected');
+        } else {
+          colorConfig.neon.colors.push(hex);
+          button.classList.add('selected');
+        }
+        updatePreview();
+      });
+
+      inputs.neonPalette.append(button);
+    });
+  }
+
+  colorOptions.normal?.addEventListener('change', () => {
+    if (colorOptions.normal.checked) {
+      if (!sanitizeHex(colorConfig.normal.baseHex)) {
+        colorConfig.normal.baseHex = DEFAULT_NORMAL;
+      }
+      const current = sanitizeHex(colorConfig.normal.baseHex) || DEFAULT_NORMAL;
+      if (inputs.normalText) {
+        inputs.normalText.value = current;
+      }
+      if (inputs.normalColor) {
+        inputs.normalColor.value = current;
+      }
+      colorConfig.normal.enabled = true;
+    } else {
+      colorConfig.normal.enabled = false;
+    }
+    updatePanelVisibility();
+  });
+
+  colorOptions.glow?.addEventListener('change', () => {
+    const enabled = colorOptions.glow.checked;
+    colorConfig.glow.enabled = enabled;
+    if (panels.glow) {
+      panels.glow.hidden = !enabled;
+    }
+    if (enabled) {
+      if (!sanitizeHex(colorConfig.glow.baseHex)) {
+        const baseFallback = sanitizeHex(inputs.glowBaseText?.value) || sanitizeHex(inputs.glowBaseColor?.value) || DEFAULT_GLOW_BASE;
+        colorConfig.glow.baseHex = baseFallback;
+        if (inputs.glowBaseText) {
+          inputs.glowBaseText.value = baseFallback;
+        }
+        if (inputs.glowBaseColor) {
+          inputs.glowBaseColor.value = baseFallback;
+        }
+      }
+      if (!sanitizeHex(colorConfig.glow.glowHex)) {
+        const glowFallback = sanitizeHex(inputs.glowHexText?.value) || sanitizeHex(inputs.glowHexColor?.value) || DEFAULT_GLOW_GLOW;
+        colorConfig.glow.glowHex = glowFallback;
+        if (inputs.glowHexText) {
+          inputs.glowHexText.value = glowFallback;
+        }
+        if (inputs.glowHexColor) {
+          inputs.glowHexColor.value = glowFallback;
+        }
+      }
+    } else {
+      colorConfig.glow.baseHex = '';
+      colorConfig.glow.glowHex = '';
+    }
+    renderNeonPalette();
+    updatePanelVisibility();
+  });
+
+  colorOptions.multicolor?.addEventListener('change', () => {
+    const enabled = colorOptions.multicolor.checked;
+    colorConfig.multicolor.enabled = enabled;
+    if (panels.multicolor) {
+      panels.multicolor.hidden = !enabled;
+    }
+    if (enabled) {
+      const count = Number(inputs.multicolorCount?.value) || colorConfig.multicolor.colors.length || 2;
+      ensureMulticolorColors(count);
+      renderMulticolorInputs();
+    } else if (inputs.multicolorInputs) {
+      colorConfig.multicolor.colors = [];
+      inputs.multicolorInputs.innerHTML = '';
+    }
+    updatePanelVisibility();
+  });
+
+  colorOptions.neon?.addEventListener('change', () => {
+    const enabled = colorOptions.neon.checked;
+    colorConfig.neon.enabled = enabled;
+    if (panels.neon) {
+      panels.neon.hidden = !enabled;
+    }
+    if (!enabled) {
+      colorConfig.neon.colors = [];
+    }
+    renderNeonPalette();
+    updatePanelVisibility();
+  });
+
+  colorOptions.transparent?.addEventListener('change', () => {
+    colorConfig.transparent = colorOptions.transparent.checked;
+    updatePreview();
+  });
+
+  inputs.multicolorCount?.addEventListener('change', () => {
+    if (!colorOptions.multicolor?.checked) {
+      return;
+    }
+    const count = Number(inputs.multicolorCount.value) || 2;
+    ensureMulticolorColors(count);
+    renderMulticolorInputs();
+    updatePreview();
+  });
+
+  const setNormalHex = attachHexSync(inputs.normalText, inputs.normalColor, (hex) => {
+    colorConfig.normal.baseHex = hex;
+  }, DEFAULT_NORMAL);
+
+  const setGlowBaseHex = attachHexSync(inputs.glowBaseText, inputs.glowBaseColor, (hex) => {
+    colorConfig.glow.baseHex = hex;
+  }, DEFAULT_GLOW_BASE);
+
+  const setGlowGlowHex = attachHexSync(inputs.glowHexText, inputs.glowHexColor, (hex) => {
+    colorConfig.glow.glowHex = hex;
+  }, DEFAULT_GLOW_GLOW);
+
+  renderPalette(paletteContainers.normal, (hex) => {
+    setNormalHex(hex);
+  }, () => colorOptions.normal?.checked);
+
+  renderPalette(paletteContainers.glowBase, (hex) => {
+    setGlowBaseHex(hex);
+  }, () => colorOptions.glow?.checked);
+
+  renderPalette(paletteContainers.glowGlow, (hex) => {
+    setGlowGlowHex(hex);
+  }, () => colorOptions.glow?.checked);
+
+  renderNeonPalette();
+
+  if (colorOptions.normal) {
+    const baseHex = colorConfig.normal.baseHex || DEFAULT_NORMAL;
+    colorOptions.normal.checked = Boolean(colorConfig.normal.enabled && colorConfig.normal.baseHex);
+    if (inputs.normalText) {
+      inputs.normalText.value = baseHex;
+    }
+    if (inputs.normalColor) {
+      inputs.normalColor.value = baseHex;
+    }
+  }
+
+  if (colorOptions.glow) {
+    const baseHex = colorConfig.glow.baseHex || DEFAULT_GLOW_BASE;
+    const glowHex = colorConfig.glow.glowHex || DEFAULT_GLOW_GLOW;
+    colorOptions.glow.checked = Boolean(colorConfig.glow.enabled && colorConfig.glow.baseHex);
+    if (inputs.glowBaseText) {
+      inputs.glowBaseText.value = baseHex;
+    }
+    if (inputs.glowBaseColor) {
+      inputs.glowBaseColor.value = baseHex;
+    }
+    if (inputs.glowHexText) {
+      inputs.glowHexText.value = glowHex;
+    }
+    if (inputs.glowHexColor) {
+      inputs.glowHexColor.value = glowHex;
+    }
+  }
+
+  if (colorOptions.multicolor) {
+    const existingCount = colorConfig.multicolor.colors.length || Number(inputs.multicolorCount?.value) || 2;
+    if (inputs.multicolorCount) {
+      const options = Array.from(inputs.multicolorCount.options || []);
+      if (!options.some((opt) => Number(opt.value) === existingCount)) {
+        const opt = document.createElement('option');
+        opt.value = String(existingCount);
+        opt.textContent = existingCount;
+        inputs.multicolorCount.append(opt);
+      }
+      inputs.multicolorCount.value = String(existingCount);
+    }
+    colorOptions.multicolor.checked = Boolean(colorConfig.multicolor.enabled && colorConfig.multicolor.colors.length);
+    if (colorOptions.multicolor.checked) {
+      ensureMulticolorColors(Number(inputs.multicolorCount?.value) || existingCount);
+      renderMulticolorInputs();
+    } else if (inputs.multicolorInputs) {
+      inputs.multicolorInputs.innerHTML = '';
+    }
+  }
+
+  if (colorOptions.neon) {
+    colorOptions.neon.checked = Boolean(colorConfig.neon.enabled && colorConfig.neon.colors.length);
+    renderNeonPalette();
+  }
+
+  if (colorOptions.transparent) {
+    colorOptions.transparent.checked = Boolean(colorConfig.transparent);
+    colorConfig.transparent = colorOptions.transparent.checked;
+  }
+
+  updatePanelVisibility();
+
+  return {
+    colorConfig,
+    getConfig: () => normaliseColorConfig(colorConfig),
+    updatePreview
+  };
+}
+
+function initInventoryPage() {
+  const table = document.getElementById('inventory-table');
+  if (!table) {
+    return;
+  }
+  const rows = Array.from(table.querySelectorAll('tbody tr[data-id]'));
+  const totalExpectedEl = document.getElementById('inventory-total-expected');
+  const totalCountedEl = document.getElementById('inventory-total-counted');
+  const totalDiffEl = document.getElementById('inventory-total-diff');
+  const exportBtn = document.getElementById('inventory-export-btn');
+
+  function parseNumber(value) {
+    const num = Number(value);
+    return Number.isFinite(num) ? num : 0;
+  }
+
+  function updateRow(row) {
+    const expected = parseNumber(row.dataset.expected);
+    const input = row.querySelector('.inventory-count-input');
+    let counted = parseNumber(input?.value);
+    if (counted < 0) {
+      counted = 0;
+    }
+    if (input) {
+      input.value = counted;
+    }
+    row.dataset.counted = counted;
+    const diff = counted - expected;
+    const diffCell = row.querySelector('.inventory-diff');
+    if (diffCell) {
+      diffCell.textContent = diff > 0 ? `+${diff}` : diff.toString();
+      diffCell.classList.toggle('is-negative', diff < 0);
+      diffCell.classList.toggle('is-positive', diff > 0);
+    }
+  }
+
+  function updateTotals() {
+    let expectedTotal = 0;
+    let countedTotal = 0;
+    rows.forEach((row) => {
+      const expected = parseNumber(row.dataset.expected);
+      const counted = parseNumber(row.dataset.counted ?? row.dataset.expected);
+      expectedTotal += expected;
+      countedTotal += counted;
+    });
+    const diff = countedTotal - expectedTotal;
+    if (totalExpectedEl) {
+      totalExpectedEl.textContent = expectedTotal.toString();
+    }
+    if (totalCountedEl) {
+      totalCountedEl.textContent = countedTotal.toString();
+    }
+    if (totalDiffEl) {
+      totalDiffEl.textContent = diff > 0 ? `+${diff}` : diff.toString();
+      totalDiffEl.classList.toggle('is-negative', diff < 0);
+      totalDiffEl.classList.toggle('is-positive', diff > 0);
+    }
+  }
+
+  rows.forEach((row) => {
+    updateRow(row);
+    const input = row.querySelector('.inventory-count-input');
+    if (input) {
+      input.addEventListener('input', () => {
+        updateRow(row);
+        updateTotals();
+      });
+      input.addEventListener('change', () => {
+        updateRow(row);
+        updateTotals();
+      });
+    }
+  });
+
+  updateTotals();
+
+  exportBtn?.addEventListener('click', async () => {
+    if (exportBtn.disabled) {
+      return;
+    }
+    exportBtn.disabled = true;
+    const counts = {};
+    rows.forEach((row) => {
+      const id = row.dataset.id;
+      if (!id) {
+        return;
+      }
+      counts[id] = parseNumber(row.dataset.counted ?? row.dataset.expected);
+    });
+
+    try {
+      const res = await fetch('/inventory/export', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ counts })
+      });
+      if (!res.ok) {
+        throw new Error(`Export failed: ${res.status}`);
+      }
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      const today = new Date().toISOString().slice(0, 10);
+      link.href = url;
+      link.download = `inventur_${today}.pdf`;
+      document.body.append(link);
+      link.click();
+      requestAnimationFrame(() => {
+        URL.revokeObjectURL(url);
+        link.remove();
+      });
+    } catch (error) {
+      console.error(error);
+      alert(t('inventory_export_failed'));
+    } finally {
+      exportBtn.disabled = false;
+    }
+  });
 }
 
 function initCreateForm() {
@@ -139,52 +1004,69 @@ function initCreateForm() {
     return;
   }
 
-  const colorListEl = document.getElementById('color-list');
-  const colorPicker = document.getElementById('color-picker');
-  const addColorBtn = document.getElementById('add-color');
-  const printLink = document.getElementById('print-label-link');
-  const colors = [];
+  const colorControls = setupColorControls(form, {}, null);
+  const colorsRequired = form.dataset.colorsRequired === 'true';
+  const resinCheckbox = form.querySelector('#resin-checkbox');
+  const diameterField = form.querySelector('[data-field="diameter"]');
+  const diameterSelect = form.querySelector('#diameter-select');
+  const densityHidden = form.querySelector('#density-hidden');
+  const diameterRequired = diameterSelect?.dataset.required === 'true';
+  const weightUnit = form?.dataset.weightUnit || 'g';
 
-  function renderColors() {
-    colorListEl.innerHTML = colors
-      .map(
-        (c, index) => `
-        <span class="color-tag">
-          <span class="color-swatch" style="--color: ${c}" title="${c}"></span>
-          ${c}
-          <button type="button" data-index="${index}" aria-label="Remove">×</button>
-        </span>`
-      )
-      .join('');
+  const printLink = document.getElementById('print-label-link');
+  const previewBtn = document.getElementById('preview-label');
+  const labelOptions = document.getElementById('label-options');
+
+  let latestFilamentId = null;
+
+  if (printLink) {
+    printLink.hidden = true;
+  }
+  if (previewBtn) {
+    previewBtn.hidden = true;
+  }
+  if (labelOptions) {
+    labelOptions.hidden = true;
   }
 
-  addColorBtn?.addEventListener('click', () => {
-    const color = colorPicker.value;
-    if (!colors.includes(color)) {
-      colors.push(color);
-      renderColors();
+  function updateResinUI() {
+    const isResin = resinCheckbox?.checked;
+    if (diameterField) {
+      diameterField.style.display = isResin ? 'none' : '';
     }
-  });
+    if (diameterSelect) {
+      diameterSelect.required = !isResin && diameterRequired;
+    }
+    if (densityHidden) {
+      densityHidden.value = isResin ? '1.10' : '1.24';
+    }
+  }
 
-  colorListEl?.addEventListener('click', (event) => {
-    const btn = event.target.closest('button[data-index]');
-    if (!btn) {
-      return;
-    }
-    const index = Number(btn.dataset.index);
-    colors.splice(index, 1);
-    renderColors();
-  });
+  resinCheckbox?.addEventListener('change', updateResinUI);
+  updateResinUI();
 
   form.addEventListener('submit', async (event) => {
     event.preventDefault();
     const formData = new FormData(form);
     const payload = Object.fromEntries(formData.entries());
 
-    if (colors.length > 0) {
-      payload.colorsHex = [...colors];
-    } else {
-      delete payload.colorsHex;
+    const colorConfig = colorControls.getConfig();
+    if (colorsRequired && !hasSelectedColors(colorConfig)) {
+      alert(t('colors_required'));
+      return;
+    }
+    payload.colorsHex = colorConfig;
+
+    if (weightUnit !== 'g') {
+      const factor = weightUnit === 'oz' ? 28.349523125 : 453.59237;
+      ['netWeightG', 'remainingG'].forEach((field) => {
+        if (payload[field]) {
+          const val = Number(payload[field]);
+          if (Number.isFinite(val)) {
+            payload[field] = (val * factor).toFixed(2);
+          }
+        }
+      });
     }
 
     const res = await fetch('/api/filaments', {
@@ -194,18 +1076,190 @@ function initCreateForm() {
     });
 
     if (!res.ok) {
-      alert('Fehler beim Speichern');
+      let messageShown = false;
+      try {
+        const problem = await res.json();
+        if (problem?.error === 'colors_required') {
+          alert(t('colors_required'));
+          messageShown = true;
+        }
+      } catch (error) {
+        /** noop */
+      }
+      if (!messageShown) {
+        alert('Fehler beim Speichern');
+      }
       return;
     }
 
     const data = await res.json();
     const filament = data.filament;
     if (filament) {
-      printLink.href = `/print/label/${filament.id}`;
-      printLink.hidden = false;
-      printLink.textContent = t('print_label');
+      latestFilamentId = filament.id;
+      if (printLink) {
+        printLink.href = `/print/label/${filament.id}`;
+        printLink.hidden = false;
+        printLink.textContent = t('print_label');
+      }
+      if (previewBtn) {
+        previewBtn.hidden = false;
+        previewBtn.dataset.id = filament.id;
+      }
+      if (labelOptions) {
+        labelOptions.hidden = false;
+      }
     }
     alert('Gespeichert');
+  });
+
+  previewBtn?.addEventListener('click', () => {
+    const filamentId = previewBtn.dataset.id || latestFilamentId;
+    if (!filamentId) {
+      return;
+    }
+    const selectedType = form.querySelector('input[name="labelType"]:checked')?.value || 'both';
+    const url = `/print/label/${filamentId}?type=${selectedType}`;
+    window.open(url, '_blank');
+  });
+
+  printLink?.addEventListener('click', (event) => {
+    const filamentId = previewBtn?.dataset.id || latestFilamentId;
+    if (!filamentId) {
+      event.preventDefault();
+      return;
+    }
+    printLink.href = `/print/label/${filamentId}`;
+  });
+}
+
+function convertWeightToGrams(value, unit) {
+  if (value === null || value === undefined) {
+    return null;
+  }
+  const normalized = value.toString().trim().replace(',', '.');
+  if (normalized === '') {
+    return null;
+  }
+  const num = Number(normalized);
+  if (!Number.isFinite(num) || num < 0) {
+    return null;
+  }
+  if (unit === 'oz') {
+    return Number((num * 28.349523125).toFixed(2));
+  }
+  if (unit === 'lb') {
+    return Number((num * 453.59237).toFixed(2));
+  }
+  return Number(num.toFixed(2));
+}
+
+function initEditForm() {
+  const form = document.getElementById('filament-edit-form');
+  if (!form) {
+    return;
+  }
+  const filamentId = form.dataset.id;
+  const weightUnit = document.body?.dataset?.weightUnit || 'g';
+  let initialColorConfig = {};
+  const rawConfig = form.dataset.colorConfig;
+  if (rawConfig) {
+    try {
+      initialColorConfig = JSON.parse(rawConfig);
+    } catch (error) {
+      initialColorConfig = {};
+    }
+  }
+  const debugTarget = document.getElementById('color-debug-json');
+  const updateDebug = (config) => {
+    if (!debugTarget) {
+      return;
+    }
+    debugTarget.textContent = JSON.stringify(config, null, 2);
+  };
+
+  const colorControls = setupColorControls(form, initialColorConfig, updateDebug);
+  if (debugTarget) {
+    updateDebug(colorControls.getConfig());
+  }
+  const colorsRequired = form.dataset.colorsRequired === 'true';
+
+  form.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    const formData = new FormData(form);
+    const payload = {};
+
+    const price = formData.get('priceNewEUR');
+    if (price !== null) {
+      const normalized = price.toString().trim().replace(',', '.');
+      if (normalized === '') {
+        payload.priceNewEUR = null;
+      } else {
+        const num = Number(normalized);
+        if (!Number.isFinite(num)) {
+          alert(t('update_failed'));
+          return;
+        }
+        payload.priceNewEUR = Number(num.toFixed(2));
+      }
+    }
+
+    const netWeight = formData.get('netWeightG');
+    if (netWeight !== null) {
+      const grams = convertWeightToGrams(netWeight, weightUnit);
+      if (grams === null) {
+        alert(t('invalid_remaining'));
+        return;
+      }
+      payload.netWeightG = grams;
+    }
+
+    const remaining = formData.get('remainingG');
+    if (remaining !== null) {
+      const grams = convertWeightToGrams(remaining, weightUnit);
+      if (grams === null) {
+        alert(t('invalid_remaining'));
+        return;
+      }
+      payload.remainingG = grams;
+    }
+
+    const notes = formData.get('notes');
+    if (notes !== null) {
+      payload.notes = notes;
+    }
+
+    const colorConfig = colorControls.getConfig();
+    if (colorsRequired && !hasSelectedColors(colorConfig)) {
+      alert(t('colors_required'));
+      return;
+    }
+    payload.colorsHex = colorConfig;
+
+    const res = await fetch(`/api/filaments/${filamentId}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+
+    if (!res.ok) {
+      let messageShown = false;
+      try {
+        const problem = await res.json();
+        if (problem?.error === 'colors_required') {
+          alert(t('colors_required'));
+          messageShown = true;
+        }
+      } catch (error) {
+        /** noop */
+      }
+      if (!messageShown) {
+        alert(t('update_failed'));
+      }
+      return;
+    }
+
+    alert(t('update_success'));
+    window.location.href = `/filaments/${filamentId}`;
   });
 }
 
@@ -357,4 +1411,13 @@ function formatNumber(value) {
   }
   return Number(value).toFixed(2);
 }
+
+ready(() => {
+  initListPage();
+  initCreateForm();
+  initEditForm();
+  initDetailPage();
+  initGcodePage();
+  initInventoryPage();
+});
 
