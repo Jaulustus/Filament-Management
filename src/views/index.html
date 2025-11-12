@@ -1,87 +1,155 @@
-<section class="panel">
-  <div class="panel__header">
-    <input id="search-input" class="search-field" type="search" name="search" placeholder="{{t 'search'}}" autofocus>
-    <label class="toggle">
-      <input id="show-archived" type="checkbox" {{#if showArchived}}checked{{/if}}>
-      <span>{{t 'show_archived'}}</span>
-    </label>
-    <div class="total-quantity">
-      <span class="total-quantity__label">{{t 'total_quantity'}}</span>
-      <span class="total-quantity__value" id="total-quantity-value">{{totalQuantity}}</span>
+<section class="panel landing" data-page="landing">
+  <header class="panel__title">
+    <h1>{{t 'landing_title'}}</h1>
+  </header>
+  <p class="form__hint">{{t 'landing_intro'}}</p>
+
+  <div class="landing__modes">
+    <article class="mode-card {{#if filamentEnabled}}mode-card--active{{else}}mode-card--disabled{{/if}}">
+      <h2>{{t 'landing_filament_title'}}</h2>
+      <p>{{t 'landing_filament_desc'}}</p>
+      <ul class="mode-card__stats">
+        <li>{{t 'landing_stats_total'}}: {{filamentStats.total}}</li>
+        <li>{{t 'landing_stats_active'}}: {{filamentStats.active}}</li>
+        <li>{{t 'landing_stats_archived'}}: {{filamentStats.archived}}</li>
+        <li>{{t 'landing_stats_quantity'}}: {{filamentStats.totalQuantity}}</li>
+      </ul>
+      {{#if filamentEnabled}}
+        <div class="mode-card__actions">
+          <a class="btn" href="/filament-overview">{{t 'landing_filament_button'}}</a>
+          <a class="btn btn--ghost" href="/filaments/new">{{t 'dashboard_action_new'}}</a>
+        </div>
+      {{else}}
+        <p class="mode-card__note">{{t 'landing_mode_disabled_filament'}}</p>
+      {{/if}}
+    </article>
+
+    <article class="mode-card {{#if inventoryEnabled}}mode-card--active{{else}}mode-card--disabled{{/if}}">
+      <h2>{{t 'landing_inventory_title'}}</h2>
+      <p>{{t 'landing_inventory_desc'}}</p>
+      <ul class="mode-card__stats">
+        <li>{{t 'landing_stats_total'}}: {{inventoryStats.total}}</li>
+        <li>{{t 'landing_stats_active'}}: {{inventoryStats.active}}</li>
+        <li>{{t 'landing_stats_archived'}}: {{inventoryStats.archived}}</li>
+        <li>{{t 'landing_stats_quantity'}}: {{inventoryStats.totalQuantity}}</li>
+      </ul>
+      {{#if inventoryEnabled}}
+        <div class="mode-card__actions">
+          <a class="btn" href="/inventory-overview">{{t 'landing_inventory_button'}}</a>
+          <a class="btn btn--ghost" href="/products/new">{{t 'inventory_button_new_product'}}</a>
+        </div>
+      {{else}}
+        <p class="mode-card__note">{{t 'landing_mode_disabled_inventory'}}</p>
+      {{/if}}
+    </article>
+  </div>
+
+  {{#if filamentEnabled}}
+    <div class="landing__recent">
+      <h2>{{t 'dashboard_recent_title'}}</h2>
+      {{#if recentFilaments.length}}
+        <div class="table-wrapper">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>{{t 'name'}}</th>
+                <th>{{t 'material'}}</th>
+                <th>{{t 'quantity'}}</th>
+                <th>{{t 'remaining'}} (g)</th>
+                <th>{{t 'price_new'}}</th>
+                <th>{{t 'inventory_actions'}}</th>
+              </tr>
+            </thead>
+            <tbody>
+              {{#each recentFilaments}}
+                <tr>
+                  <td><a href="/filaments/{{this.id}}">{{this.name}}</a></td>
+                  <td>{{this.material}}</td>
+                  <td>{{this.quantity}}</td>
+                  <td>{{formatDecimal this.remainingG 0}}</td>
+                  <td>{{#if this.priceNewEUR}}{{../currency}} {{formatDecimal this.priceNewEUR 2}}{{/if}}</td>
+                  <td>
+                    <a class="btn btn--ghost" href="/filaments/{{this.id}}">{{t 'landing_filament_button'}}</a>
+                  </td>
+                </tr>
+              {{/each}}
+            </tbody>
+          </table>
+        </div>
+      {{else}}
+        <p>{{t 'dashboard_recent_empty'}}</p>
+      {{/if}}
     </div>
-  </div>
+  {{/if}}
 
-  <div class="table-wrapper">
-    <table class="data-table" id="filament-table">
-      <thead>
-        <tr>
-          <th>{{t 'name'}}</th>
-          <th>{{t 'material'}}</th>
-          <th>{{t 'diameter'}} ({{ui.form.units.length}})</th>
-          <th>{{t 'colors'}}</th>
-          <th>{{t 'net_weight'}} ({{ui.form.units.weight}})</th>
-          <th>{{t 'remaining'}} ({{ui.form.units.weight}})</th>
-          <th>{{t 'quantity'}}</th>
-          <th>{{t 'id_number'}}</th>
-          <th>{{t 'price_new'}}</th>
-          <th>{{t 'product_link'}}</th>
-          <th>{{t 'usage'}}</th>
-        </tr>
-      </thead>
-      <tbody>
-        {{#each filaments}}
-          <tr data-id="{{id}}" class="{{#if archived}}archived{{/if}}">
-            <td><a href="/filaments/{{id}}">{{name}}</a></td>
-            <td>{{material}}</td>
-            <td>{{formatLength diameterMm ../ui.form.units.length}}</td>
-            <td>
-              {{#if colorsHex}}
-                <div class="color-swatches">
-                  {{#each colorsHex}}
-                    <span class="color-variant">
-                      {{#if labelKey}}<span class="color-variant__label">{{t labelKey}}</span>{{/if}}
-                      {{#each swatches}}
-                        <span class="color-swatch {{#if glow}}color-swatch--glow{{/if}}" style="--color: {{hex}}" title="{{hex}}"></span>
-                      {{/each}}
-                      {{#if transparent}}
-                        <span class="color-tag color-tag--transparent">{{t 'color_transparent'}}</span>
-                      {{/if}}
-                      {{#if count}}
-                        <span class="color-variant__meta">×{{count}}</span>
-                      {{/if}}
-                    </span>
-                  {{/each}}
-                </div>
-              {{/if}}
-            </td>
-            <td>{{formatWeight netWeightG ../ui.form.units.weight}} {{../ui.form.units.weight}}</td>
-            <td data-remaining>{{formatWeight remainingG ../ui.form.units.weight}} {{../ui.form.units.weight}}</td>
-            <td>{{quantity}}</td>
-            <td>
-              <div class="id-block">
-                <span class="id-text">{{id}}</span>
-                <div class="id-actions">
-                  <a href="/api/codes/barcode.svg?id={{id}}" target="_blank" title="{{t 'barcode'}}">📦</a>
-                  <a href="/api/codes/qr.png?text={{encodeURI (filamentUrl id)}}" target="_blank" title="{{t 'qrcode'}}">🔳</a>
-                </div>
-              </div>
-            </td>
-            <td>{{#if priceNewEUR}}{{../ui.form.currency}} {{formatDecimal priceNewEUR 2}}{{/if}}</td>
-            <td>{{#if productUrl}}<a href="{{productUrl}}" target="_blank" rel="noopener">Link</a>{{/if}}</td>
-            <td>
-              <button class="btn" data-action="restock">{{t 'restock'}}</button>
-              <a class="btn" href="/print/label/{{id}}" target="_blank">{{t 'reprint_label'}}</a>
-              {{#if archived}}
-                <button class="btn" data-action="unarchive">{{t 'unarchive'}}</button>
-              {{else}}
-                <button class="btn btn--danger" data-action="archive">{{t 'archive'}}</button>
-              {{/if}}
-              <button class="btn btn--danger" data-action="delete">{{t 'delete'}}</button>
-            </td>
-          </tr>
-        {{/each}}
-      </tbody>
-    </table>
-  </div>
+  {{#if inventoryEnabled}}
+    <div class="landing__recent landing__recent--inventory">
+      <h2>{{t 'landing_recent_inventory_title'}}</h2>
+      {{#if recentInventory.length}}
+        <div class="table-wrapper">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>{{t 'inventory_product_name'}}</th>
+                <th>{{t 'inventory_area_column'}}</th>
+                <th>{{t 'inventory_quantity'}}</th>
+                <th>{{t 'inventory_total_price'}}</th>
+                <th>{{t 'inventory_actions'}}</th>
+              </tr>
+            </thead>
+            <tbody>
+              {{#each recentInventory}}
+                <tr>
+                  <td>
+                    <a href="/products/{{this.id}}/edit">{{this.name}}</a>
+                    {{#if this.ean}}
+                      <div class="inventory-meta">{{t 'inventory_product_ean'}}: {{this.ean}}</div>
+                    {{/if}}
+                    <div class="inventory-meta">{{t 'inventory_internal_code'}}: {{this.internalCode}}</div>
+                  </td>
+                  <td>{{#if this.area}}{{this.area}}{{else}}—{{/if}}</td>
+                  <td>{{this.quantity}}</td>
+                  <td>{{formatDecimal this.totalValue 2}} {{../currency}}</td>
+                  <td>
+                    <a class="btn btn--ghost" href="/products/{{this.id}}/edit">{{t 'inventory_edit_button'}}</a>
+                  </td>
+                </tr>
+              {{/each}}
+            </tbody>
+          </table>
+        </div>
+      {{else}}
+        <p>{{t 'landing_recent_inventory_empty'}}</p>
+      {{/if}}
+    </div>
+  {{/if}}
+
+  <section class="landing__info">
+    <h2>{{t 'landing_capabilities_title'}}</h2>
+    <p>{{t 'landing_capabilities_intro'}}</p>
+    <ul class="landing__capabilities">
+      <li>{{t 'landing_capability_filament'}}</li>
+      <li>{{t 'landing_capability_inventory'}}</li>
+      <li>{{t 'landing_capability_labels'}}</li>
+    </ul>
+  </section>
+
+  <section class="landing__credits">
+    <h2>{{t 'landing_credits_title'}}</h2>
+    <p>{{t 'landing_credits_text'}}</p>
+  </section>
+
+  <section class="landing__easter" data-eggs>
+    <h2>{{t 'landing_easter_title'}}</h2>
+    <div class="egg-list">
+      <div class="egg" data-egg>
+        <button type="button">{{t 'landing_easter_button1'}}</button>
+        <p hidden>{{t 'landing_easter_text1'}}</p>
+      </div>
+      <div class="egg" data-egg>
+        <button type="button">{{t 'landing_easter_button3'}}</button>
+        <p hidden>{{t 'landing_easter_text3'}}</p>
+      </div>
+    </div>
+  </section>
 </section>
-

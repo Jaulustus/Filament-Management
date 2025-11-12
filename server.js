@@ -9,6 +9,7 @@ import bodyParser from 'body-parser';
 import filamentRoutes from './src/routes/filament.js';
 import gcodeRoutes from './src/routes/gcode.js';
 import codesRoutes from './src/routes/codes.js';
+import inventoryRoutes from './src/routes/inventory.js';
 import { initI18n } from './src/lib/i18n.js';
 import { buildLabelData } from './src/lib/pdf.js';
 import { loadConfig, saveConfig, buildUiMeta, defaultConfig } from './src/lib/config.js';
@@ -20,6 +21,10 @@ const prisma = new PrismaClient();
 
 const app = express();
 const PORT = process.env.PORT || 3000;
+const APP_MODE = (process.env.APP_MODE || 'both').toLowerCase();
+const FILAMENT_ENABLED = APP_MODE === 'both' || APP_MODE === 'filament';
+const INVENTORY_ENABLED = APP_MODE === 'both' || APP_MODE === 'inventur';
+console.log(`Server mode: ${APP_MODE}`);
 
 const lengthOptions = [
   { value: 'mm', label: 'mm' },
@@ -197,6 +202,38 @@ const currencyOptions = [
 
 const currencySet = new Set(currencyOptions.map((option) => option.value));
 
+const landingNavLinks = [
+  { href: '/', labelKey: 'menu_dashboard' },
+  { href: '/settings', labelKey: 'menu_settings' }
+];
+
+const filamentNavLinks = [
+  { href: '/', labelKey: 'menu_dashboard' },
+  { href: '/filament-overview', labelKey: 'menu_filament_overview' },
+  { href: '/filaments/new', labelKey: 'menu_new' },
+  { href: '/inventory-overview', labelKey: 'menu_inventory' },
+  { href: '/upload-gcode', labelKey: 'menu_upload' }
+];
+
+const inventoryNavLinks = [
+  { href: '/', labelKey: 'menu_dashboard' },
+  { href: '/inventory-overview', labelKey: 'menu_inventory_overview' },
+  { href: '/products/new', labelKey: 'menu_inventory_new_product' },
+  { href: '/inventory-audit', labelKey: 'menu_inventory_pdf_export' }
+];
+
+const navContextMap = {
+  landing: landingNavLinks,
+  filament: filamentNavLinks,
+  inventory: inventoryNavLinks
+};
+
+const brandKeyMap = {
+  landing: 'brand_landing',
+  filament: 'brand_filament',
+  inventory: 'brand_inventory'
+};
+
 const requiredFieldDefs = [
   { key: 'name', labelKey: 'name' },
   { key: 'manufacturer', labelKey: 'manufacturer' },
@@ -215,6 +252,10 @@ app.locals.config = appConfig;
 app.locals.ui = buildUiMeta(appConfig, requiredFieldDefs);
 app.locals.requiredFieldDefs = requiredFieldDefs;
 app.locals.currencyOptions = currencyOptions;
+app.locals.appMode = APP_MODE;
+app.locals.filamentEnabled = FILAMENT_ENABLED;
+app.locals.inventoryEnabled = INVENTORY_ENABLED;
+app.locals.navLinks = landingNavLinks;
 
 app.set('prisma', prisma);
 
@@ -280,69 +321,233 @@ app.set('views', viewsPath);
 app.use(bodyParser.urlencoded({ extended: true }));
 app.use(bodyParser.json());
 app.use(express.static(publicPath));
+app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
+
+const filamentPathPrefixes = ['/filament', '/filaments', '/upload-gcode', '/gcode', '/print'];
+const inventoryPathPrefixes = ['/inventory-overview', '/inventory', '/inventory-audit', '/products'];
+
+function resolveNavContext(pathname) {
+  if (APP_MODE === 'filament') {
+    return 'filament';
+  }
+  if (APP_MODE === 'inventur') {
+    return 'inventory';
+  }
+
+  if (pathname === '/') {
+    return 'landing';
+  }
+
+  if (inventoryPathPrefixes.some((prefix) => pathname.startsWith(prefix))) {
+    return 'inventory';
+  }
+
+  if (filamentPathPrefixes.some((prefix) => pathname.startsWith(prefix))) {
+    return 'filament';
+  }
+
+  return 'landing';
+}
 
 app.use((req, res, next) => {
+  const pathname = req.path.toLowerCase();
+  const context = resolveNavContext(pathname);
+
   res.locals.ui = req.app.locals.ui;
   res.locals.config = req.app.locals.config;
   res.locals.requiredFieldDefs = req.app.locals.requiredFieldDefs;
   res.locals.currencyOptions = req.app.locals.currencyOptions;
+  res.locals.appMode = req.app.locals.appMode;
+  res.locals.navLinks = navContextMap[context] || landingNavLinks;
+  res.locals.topbarBrandKey = brandKeyMap[context] || 'app_title';
+  res.locals.topbarLogoKey = context === 'inventory' ? 'brand_inventory' : null;
+  res.locals.showLanguageSwitcher = true;
   next();
 });
 
 initI18n(app);
 
-app.use(filamentRoutes);
-app.use(gcodeRoutes);
-app.use(codesRoutes);
-
-app.get('/print/label/:id', async (req, res, next) => {
+app.get('/', async (req, res, next) => {
   try {
-    const id = req.params.id.toLowerCase();
-    const filament = await prisma.filament.findUnique({ where: { id } });
-    if (!filament) {
-      return res.status(404).render('print_label', { notFound: true });
-    }
-    const hostUrl = `${req.protocol}://${req.get('host')}`;
-    const envBase = process.env.BASE_URL && process.env.BASE_URL.trim();
-    const baseUrl = envBase && /^https?:\/\//i.test(envBase) ? envBase.replace(/\/$/, '') : hostUrl;
-    const barcodeUrl = `/api/codes/barcode.png?id=${encodeURIComponent(id)}`;
-    const qrTarget = `${baseUrl}/filaments/${id}`;
-    const qrUrl = `/api/codes/qr.png?text=${encodeURIComponent(qrTarget)}`;
+    const [
+      totalFilaments,
+      archivedFilaments,
+      filamentQuantityAgg,
+      recentFilamentsRaw,
+      totalInventory,
+      archivedInventory,
+      inventoryQuantityAgg,
+      recentInventoryRaw
+    ] = await Promise.all([
+      prisma.filament.count(),
+      prisma.filament.count({ where: { archived: true } }),
+      prisma.filament.aggregate({ _sum: { quantity: true } }),
+      prisma.filament.findMany({
+        orderBy: { updatedAt: 'desc' },
+        take: 5,
+        select: {
+          id: true,
+          name: true,
+          material: true,
+          quantity: true,
+          remainingG: true,
+          priceNewEUR: true,
+          updatedAt: true
+        }
+      }),
+      prisma.inventoryItem.count(),
+      prisma.inventoryItem.count({ where: { archived: true } }),
+      prisma.inventoryItem.aggregate({ _sum: { quantity: true } }),
+      INVENTORY_ENABLED
+        ? prisma.inventoryItem.findMany({
+            orderBy: { updatedAt: 'desc' },
+            take: 5,
+            select: {
+              id: true,
+              name: true,
+              area: true,
+              quantity: true,
+              unitPrice: true,
+              ean: true,
+              internalCode: true,
+              imageUrl: true,
+              imageFile: true,
+              updatedAt: true,
+              archived: true
+            }
+          })
+        : []
+    ]);
 
-    const labelSizes = req.app.locals.config.labelSizes || defaultConfig.labelSizes;
-    const mmToPx = (mm) => Number(((mm / 25.4) * 96).toFixed(2));
-    const dims = {
-      barcodeWidthMm: labelSizes.barcodeWidthMm ?? defaultConfig.labelSizes.barcodeWidthMm,
-      barcodeHeightMm: labelSizes.barcodeHeightMm ?? defaultConfig.labelSizes.barcodeHeightMm,
-      qrSizeMm: labelSizes.qrSizeMm ?? defaultConfig.labelSizes.qrSizeMm
-    };
-    const dimensionPx = {
-      barcodeWidthPx: mmToPx(dims.barcodeWidthMm),
-      barcodeHeightPx: mmToPx(dims.barcodeHeightMm),
-      qrSizePx: mmToPx(dims.qrSizeMm)
+    const filamentStats = {
+      total: totalFilaments,
+      archived: archivedFilaments,
+      active: totalFilaments - archivedFilaments,
+      totalQuantity: Number(filamentQuantityAgg._sum.quantity || 0)
     };
 
-    const label = buildLabelData(filament, { barcodeUrl, qrUrl, dimensions: { ...dims, ...dimensionPx } });
-    const labelType = ['1d', '2d', 'both'].includes(req.query.type) ? req.query.type : 'both';
-    res.render('print_label', { label, labelType });
+    const inventoryStats = {
+      total: totalInventory,
+      archived: archivedInventory,
+      active: totalInventory - archivedInventory,
+      totalQuantity: Number(inventoryQuantityAgg._sum.quantity || 0)
+    };
+
+    const recentFilaments = recentFilamentsRaw.map((item) => ({
+      id: item.id,
+      name: item.name,
+      material: item.material,
+      quantity: item.quantity,
+      remainingG: Number(item.remainingG),
+      priceNewEUR: item.priceNewEUR ? Number(item.priceNewEUR) : null,
+      updatedAt: item.updatedAt
+    }));
+
+    const recentInventory = (recentInventoryRaw || []).map((item) => {
+      const unitPriceRaw = item.unitPrice;
+      const unitPrice =
+        unitPriceRaw && typeof unitPriceRaw.toNumber === 'function'
+          ? unitPriceRaw.toNumber()
+          : Number(unitPriceRaw || 0);
+      const quantity = Number(item.quantity || 0);
+      const totalValue = unitPrice * quantity;
+      return {
+        id: item.id,
+        name: item.name,
+        area: item.area || '',
+        quantity,
+        unitPrice,
+        totalValue,
+        ean: item.ean || '',
+        internalCode: item.internalCode,
+        imageUrl: item.imageUrl,
+        imageFile: item.imageFile,
+        archived: item.archived,
+        updatedAt: item.updatedAt
+      };
+    });
+
+    res.render('index', {
+      appMode: APP_MODE,
+      filamentEnabled: FILAMENT_ENABLED,
+      inventoryEnabled: INVENTORY_ENABLED,
+      filamentStats,
+      inventoryStats,
+      recentFilaments,
+      recentInventory,
+      currency: req.app.locals.config?.currency || 'EUR'
+    });
   } catch (error) {
     next(error);
   }
 });
 
-app.get('/settings', (req, res) => {
-  res.render('settings', {
-    config: req.app.locals.config,
-    ui: req.app.locals.ui,
-    lengthOptions,
-    weightOptions,
-    currencyOptions,
-    requiredFieldDefs,
-    saved: req.query.saved === '1'
+if (FILAMENT_ENABLED) {
+  app.use(filamentRoutes);
+  app.use(gcodeRoutes);
+
+  app.get('/print/label/:id', async (req, res, next) => {
+    try {
+      const id = req.params.id.toLowerCase();
+      const filament = await prisma.filament.findUnique({ where: { id } });
+      if (!filament) {
+        return res.status(404).render('print_label', { notFound: true });
+      }
+      const hostUrl = `${req.protocol}://${req.get('host')}`;
+      const envBase = process.env.BASE_URL && process.env.BASE_URL.trim();
+      const baseUrl = envBase && /^https?:\/\//i.test(envBase) ? envBase.replace(/\/$/, '') : hostUrl;
+      const barcodeUrl = `/api/codes/barcode.png?id=${encodeURIComponent(id)}`;
+      const qrTarget = `${baseUrl}/filaments/${id}`;
+      const qrUrl = `/api/codes/qr.png?text=${encodeURIComponent(qrTarget)}`;
+
+      const labelSizes = req.app.locals.config.labelSizes || defaultConfig.labelSizes;
+      const mmToPx = (mm) => Number(((mm / 25.4) * 96).toFixed(2));
+      const dims = {
+        barcodeWidthMm: labelSizes.barcodeWidthMm ?? defaultConfig.labelSizes.barcodeWidthMm,
+        barcodeHeightMm: labelSizes.barcodeHeightMm ?? defaultConfig.labelSizes.barcodeHeightMm,
+        qrSizeMm: labelSizes.qrSizeMm ?? defaultConfig.labelSizes.qrSizeMm
+      };
+      const dimensionPx = {
+        barcodeWidthPx: mmToPx(dims.barcodeWidthMm),
+        barcodeHeightPx: mmToPx(dims.barcodeHeightMm),
+        qrSizePx: mmToPx(dims.qrSizeMm)
+      };
+
+      const label = buildLabelData(filament, { barcodeUrl, qrUrl, dimensions: { ...dims, ...dimensionPx } });
+      const labelType = ['1d', '2d', 'both'].includes(req.query.type) ? req.query.type : 'both';
+      res.render('print_label', { label, labelType });
+    } catch (error) {
+      next(error);
+    }
   });
+}
+
+if (INVENTORY_ENABLED) {
+  app.use(inventoryRoutes);
+}
+
+app.get('/settings', async (req, res, next) => {
+  try {
+    const prismaClient = req.app.get('prisma');
+    const areaRecords = await prismaClient.inventoryArea.findMany({ orderBy: { name: 'asc' } });
+    res.render('settings', {
+      config: req.app.locals.config,
+      ui: req.app.locals.ui,
+      lengthOptions,
+      weightOptions,
+      currencyOptions,
+      requiredFieldDefs,
+      includeFilamentsInInventoryReport: Boolean(req.app.locals.config?.includeFilamentsInInventoryReport),
+      inventoryAreasText: areaRecords.map((area) => area.name).join('\n'),
+      inventoryAreasList: areaRecords.map((area) => area.name),
+      saved: req.query.saved === '1'
+    });
+  } catch (error) {
+    next(error);
+  }
 });
 
-app.post('/settings', (req, res) => {
+app.post('/settings', async (req, res, next) => {
   const incoming = req.body || {};
   const current = { ...req.app.locals.config };
 
@@ -383,12 +588,53 @@ app.post('/settings', (req, res) => {
     qrSizeMm: parseLengthInput(incoming.labelQrSize, defaultConfig.labelSizes.qrSizeMm)
   };
 
-  saveConfig(current);
-  req.app.locals.config = current;
-  req.app.locals.ui = buildUiMeta(current, requiredFieldDefs);
+  const inventoryAreasRaw = Array.isArray(incoming.inventoryAreas)
+    ? incoming.inventoryAreas.join('\n')
+    : incoming.inventoryAreas;
+  const parsedAreas = (inventoryAreasRaw || '')
+    .split(/\r?\n/)
+    .map((value) => value.trim())
+    .filter((value) => value.length);
+  const uniqueAreas = Array.from(new Set(parsedAreas.map((name) => name.trim())));
+  current.inventoryAreas = uniqueAreas;
+  current.includeFilamentsInInventoryReport = Boolean(
+    incoming.includeFilamentsInInventoryReport && incoming.includeFilamentsInInventoryReport !== '0'
+  );
 
-  res.redirect('/settings?saved=1');
+  try {
+    const prismaClient = req.app.get('prisma');
+    const existingAreas = await prismaClient.inventoryArea.findMany();
+    const existingByName = new Map(existingAreas.map((area) => [area.name.toLowerCase(), area]));
+    const namesSeen = new Set();
+
+    for (const name of uniqueAreas) {
+      const normalized = name.toLowerCase();
+      if (namesSeen.has(normalized)) {
+        continue;
+      }
+      namesSeen.add(normalized);
+      if (existingByName.has(normalized)) {
+        existingByName.delete(normalized);
+      } else {
+        await prismaClient.inventoryArea.create({ data: { name } });
+      }
+    }
+
+    for (const [, area] of existingByName) {
+      await prismaClient.inventoryArea.delete({ where: { id: area.id } });
+    }
+
+    saveConfig(current);
+    req.app.locals.config = current;
+    req.app.locals.ui = buildUiMeta(current, requiredFieldDefs);
+
+    res.redirect('/settings?saved=1');
+  } catch (error) {
+    next(error);
+  }
 });
+
+app.use(codesRoutes);
 
 app.use((err, req, res, next) => {
   console.error(err);

@@ -3,6 +3,7 @@ const LANG = window.__LANG__ || 'de';
 const UNIT_LENGTH = document.body?.dataset?.lengthUnit || 'mm';
 const UNIT_WEIGHT = document.body?.dataset?.weightUnit || 'g';
 const CURRENCY = document.body?.dataset?.currency || 'EUR';
+let codeModalInstance = null;
 
 function t(key) {
   return T[key] || key;
@@ -35,13 +36,13 @@ const COLOR_PALETTE = [
 ];
 
 const NEON_COLORS = [
-  { hex: '#ff073a', name: 'Neon Rot' },
-  { hex: '#ff1493', name: 'Neon Pink' },
-  { hex: '#39ff14', name: 'Neon Grün' },
-  { hex: '#ffff33', name: 'Neon Gelb' },
-  { hex: '#ff5f1f', name: 'Neon Orange' },
-  { hex: '#7df9ff', name: 'Neon Türkis' },
-  { hex: '#9400d3', name: 'Neon Violett' }
+  { hex: '#ff073a', labelKey: 'color_neon_red' },
+  { hex: '#ff1493', labelKey: 'color_neon_pink' },
+  { hex: '#39ff14', labelKey: 'color_neon_green' },
+  { hex: '#ffff33', labelKey: 'color_neon_yellow' },
+  { hex: '#ff5f1f', labelKey: 'color_neon_orange' },
+  { hex: '#7df9ff', labelKey: 'color_neon_turquoise' },
+  { hex: '#9400d3', labelKey: 'color_neon_violet' }
 ];
 
 function sanitizeHex(value) {
@@ -62,6 +63,29 @@ function sanitizeHex(value) {
     return '';
   }
   return hex.toLowerCase();
+}
+
+function escapeHtml(value) {
+  if (!value) {
+    return '';
+  }
+  return value.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
+function bindClick(button, handler) {
+  if (!button) {
+    return;
+  }
+  if (button.__boundHandler) {
+    button.removeEventListener('click', button.__boundHandler);
+  }
+  const wrapped = (event) => {
+    event.preventDefault();
+    handler(event);
+  };
+  button.__boundHandler = wrapped;
+  button.hidden = false;
+  button.addEventListener('click', wrapped);
 }
 
 function getContrastColor(hex) {
@@ -103,17 +127,22 @@ function normaliseColorConfig(config) {
     base.glow.glowHex = '';
   }
 
-  if (!base.normal.baseHex) {
+  if (!base.normal.enabled || !base.normal.baseHex) {
     base.normal.enabled = false;
+    base.normal.baseHex = '';
   }
-  if (!base.glow.baseHex) {
+  if (!base.glow.enabled || !base.glow.baseHex) {
     base.glow.enabled = false;
+    base.glow.baseHex = '';
+    base.glow.glowHex = '';
   }
-  if (!base.multicolor.colors.length) {
+  if (!base.multicolor.enabled || !base.multicolor.colors.length) {
     base.multicolor.enabled = false;
+    base.multicolor.colors = [];
   }
-  if (!base.neon.colors.length) {
+  if (!base.neon.enabled || !base.neon.colors.length) {
     base.neon.enabled = false;
+    base.neon.colors = [];
   }
 
   return base;
@@ -317,10 +346,10 @@ function initListPage() {
         <td>${filament.productUrl ? `<a href="${filament.productUrl}" target="_blank" rel="noopener">Link</a>` : ''}</td>
         <td>
           <button class="btn" data-action="restock">${t('restock')}</button>
-          <a class="btn" href="/print/label/${filament.id}" target="_blank">${t('reprint_label')}</a>
           ${filament.archived
             ? `<button class="btn" data-action="unarchive">${t('unarchive')}</button>`
             : `<button class="btn btn--danger" data-action="archive">${t('archive')}</button>`}
+          <button class="btn btn--ghost" data-action="codes">${t('modal_codes_button')}</button>
           <button class="btn btn--danger" data-action="delete">${t('delete')}</button>
         </td>
       `;
@@ -355,7 +384,18 @@ function initListPage() {
     if (!id) {
       return;
     }
-    if (action === 'restock') {
+    if (action === 'codes') {
+      if (!codeModalInstance) {
+        return;
+      }
+      const label = row.querySelector('td a')?.textContent?.trim() || id;
+      const origin = window.location.origin || `${window.location.protocol}//${window.location.host}`;
+      codeModalInstance.open({
+        label,
+        barcodeValue: id,
+        qrValue: `${origin}/filaments/${id}`
+      });
+    } else if (action === 'restock') {
       await fetch(`/api/filaments/${id}/restock`, { method: 'POST' });
       window.open(`/print/label/${id}`, '_blank');
       await fetchData();
@@ -642,7 +682,8 @@ function setupColorControls(form, initialConfig = {}, onChange) {
       return;
     }
     inputs.neonPalette.innerHTML = '';
-    NEON_COLORS.forEach(({ hex, name }) => {
+  NEON_COLORS.forEach(({ hex, labelKey }) => {
+    const labelText = t(labelKey);
       const button = document.createElement('button');
       button.type = 'button';
       button.className = 'color-neon-option';
@@ -663,7 +704,8 @@ function setupColorControls(form, initialConfig = {}, onChange) {
       swatch.style.backgroundColor = hex;
       swatch.style.boxShadow = `0 0 10px ${hex}`;
       const label = document.createElement('span');
-      label.textContent = name;
+    label.textContent = labelText;
+    button.setAttribute('aria-label', labelText);
       button.append(swatch, label);
       button.addEventListener('click', () => {
         if (!colorOptions.neon?.checked) {
@@ -878,6 +920,188 @@ function setupColorControls(form, initialConfig = {}, onChange) {
   };
 }
 
+function createCodeModal() {
+  const modal = document.getElementById('code-modal');
+  const backdrop = document.getElementById('code-modal-backdrop');
+  if (!modal || !backdrop) {
+    return null;
+  }
+  const titleEl = modal.querySelector('#code-modal-title');
+  const subtitleEl = modal.querySelector('.modal__subtitle');
+  const barcodeImg = modal.querySelector('[data-barcode]');
+  const qrImg = modal.querySelector('[data-qr]');
+  const closeBtn = modal.querySelector('[data-modal-close]');
+  const printBtn = modal.querySelector('[data-modal-print]');
+  const filterButtons = Array.from(modal.querySelectorAll('[data-code-filter]'));
+  const barcodeBlock = modal.querySelector('[data-code-block="barcode"]');
+  const qrBlock = modal.querySelector('[data-code-block="qr"]');
+  let currentBarcode = '';
+  let currentQr = '';
+  let currentFilter = 'both';
+  let closeTimer = null;
+
+  const show = () => {
+    if (closeTimer) {
+      clearTimeout(closeTimer);
+      closeTimer = null;
+    }
+    backdrop.hidden = false;
+    modal.hidden = false;
+    requestAnimationFrame(() => {
+      backdrop.classList.add('is-visible');
+      modal.classList.add('is-visible');
+    });
+  };
+
+  const hide = () => {
+    backdrop.classList.remove('is-visible');
+    modal.classList.remove('is-visible');
+    closeTimer = setTimeout(() => {
+      backdrop.hidden = true;
+      modal.hidden = true;
+    }, 200);
+  };
+
+  const setSubtitle = (label) => {
+    if (!subtitleEl) {
+      return;
+    }
+    const template = t('modal_codes_subtitle_template') || '';
+    subtitleEl.textContent = template.replace('{label}', label || '');
+  };
+
+  const applyFilter = (value = 'both') => {
+    currentFilter = value;
+    const showBarcode = value === 'both' || value === 'barcode';
+    const showQr = value === 'both' || value === 'qr';
+    filterButtons.forEach((button) => {
+      button.classList.toggle('is-active', button.dataset.codeFilter === value);
+    });
+    if (barcodeBlock) {
+      barcodeBlock.hidden = !showBarcode;
+    }
+    if (qrBlock) {
+      qrBlock.hidden = !showQr;
+    }
+  };
+
+  const open = ({ label, barcodeValue, qrValue }) => {
+    currentBarcode = barcodeValue || '';
+    currentQr = qrValue || barcodeValue || '';
+    applyFilter('both');
+    if (titleEl) {
+      titleEl.textContent = t('modal_codes_title');
+    }
+    setSubtitle(label || '');
+    if (barcodeImg) {
+      barcodeImg.src = `/api/codes/barcode.png?id=${encodeURIComponent(currentBarcode)}`;
+    }
+    if (qrImg) {
+      qrImg.src = `/api/codes/qr.png?text=${encodeURIComponent(currentQr)}`;
+    }
+    show();
+  };
+
+  const printCodes = () => {
+    if (!currentBarcode) {
+      return;
+    }
+    const shouldPrintBarcode = currentFilter === 'both' || currentFilter === 'barcode';
+    const shouldPrintQr = currentFilter === 'both' || currentFilter === 'qr';
+    if (!shouldPrintBarcode && !shouldPrintQr) {
+      return;
+    }
+    const printWindow = window.open('', '_blank', 'width=720,height=480');
+    if (!printWindow) {
+      return;
+    }
+    const safeBarcode = encodeURIComponent(currentBarcode);
+    const safeQr = encodeURIComponent(currentQr || currentBarcode);
+    const safeLabel = escapeHtml(subtitleEl?.textContent || '');
+    const codeFragments = [];
+    if (shouldPrintBarcode) {
+      codeFragments.push(`
+            <div class="code-block">
+              <img src="/api/codes/barcode.png?id=${safeBarcode}" alt="${escapeHtml(t('modal_barcode_alt'))}">
+              <p>${escapeHtml(t('barcode'))}</p>
+            </div>
+      `);
+    }
+    if (shouldPrintQr) {
+      codeFragments.push(`
+            <div class="code-block">
+              <img src="/api/codes/qr.png?text=${safeQr}" alt="${escapeHtml(t('modal_qr_alt'))}">
+              <p>${escapeHtml(t('qrcode'))}</p>
+            </div>
+      `);
+    }
+    const codesClass = codeFragments.length > 1 ? 'codes codes--multiple' : 'codes codes--single';
+    printWindow.document.write(`
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <meta charset="utf-8">
+          <title></title>
+          <style>
+            @page { margin: 12mm; }
+            body { font-family: Arial, sans-serif; padding: 12mm; text-align: center; color: #000; }
+            h1 { font-size: 16px; margin: 0 0 6px 0; }
+            p { margin: 0 0 12px 0; font-size: 12px; }
+            .codes { display: flex; gap: 24px; justify-content: center; align-items: flex-start; }
+            .codes--single { justify-content: center; }
+            .code-block { display: flex; flex-direction: column; gap: 8px; align-items: center; }
+            .codes img { max-width: 260px; border: 1px solid #ccc; padding: 8px; background: #fff; }
+            .code-block p { margin: 0; font-size: 0.85rem; text-transform: uppercase; letter-spacing: 0.08em; }
+          </style>
+        </head>
+        <body>
+          ${safeLabel ? `<p>${safeLabel}</p>` : ''}
+          <div class="${codesClass}">
+            ${codeFragments.join('')}
+          </div>
+          <script>window.onload = () => { window.print(); };</script>
+        </body>
+      </html>
+    `);
+    printWindow.document.close();
+  };
+
+  closeBtn?.addEventListener('click', hide);
+  backdrop?.addEventListener('click', hide);
+  printBtn?.addEventListener('click', printCodes);
+  filterButtons.forEach((button) => {
+    button.addEventListener('click', () => applyFilter(button.dataset.codeFilter || 'both'));
+  });
+  document.addEventListener('keydown', (event) => {
+    if (event.key === 'Escape' && !modal.hidden) {
+      hide();
+    }
+  });
+
+  return { open, close: hide };
+}
+
+function initLandingPage() {
+  const landing = document.querySelector('[data-page="landing"]');
+  if (!landing) {
+    return;
+  }
+  landing.querySelectorAll('[data-egg]').forEach((wrapper) => {
+    const button = wrapper.querySelector('button');
+    const text = wrapper.querySelector('p');
+    if (!button || !text) {
+      return;
+    }
+    button.addEventListener('click', () => {
+      if (text.hasAttribute('hidden')) {
+        text.removeAttribute('hidden');
+      } else {
+        text.setAttribute('hidden', '');
+      }
+    });
+  });
+}
+
 function initInventoryPage() {
   const table = document.getElementById('inventory-table');
   if (!table) {
@@ -995,6 +1219,388 @@ function initInventoryPage() {
     } finally {
       exportBtn.disabled = false;
     }
+  });
+}
+
+function initInventoryManagerOverview() {
+  const table = document.getElementById('inventory-products-table');
+  if (!table) {
+    return;
+  }
+  const currency = table.dataset.currency || document.body?.dataset?.currency || '';
+  const totalQuantityEl = document.getElementById('inventory-total-quantity');
+  const totalValueEl = document.getElementById('inventory-total-value');
+
+  function formatInventoryDecimal(value, decimals = 2) {
+    if (value === null || value === undefined) {
+      return '';
+    }
+    const num = Number(value);
+    if (!Number.isFinite(num)) {
+      return '';
+    }
+    return num.toFixed(decimals);
+  }
+
+  function refreshTotals() {
+    const rows = Array.from(table.querySelectorAll('tbody tr[data-id]'));
+    let totalQuantity = 0;
+    let totalValue = 0;
+    rows.forEach((row) => {
+      const qty = Number(row.dataset.quantity || 0);
+      const price = Number(row.dataset.price || 0);
+      totalQuantity += qty;
+      totalValue += price * qty;
+    });
+    if (totalQuantityEl) {
+      totalQuantityEl.textContent = totalQuantity;
+    }
+    if (totalValueEl) {
+      totalValueEl.textContent = `${formatInventoryDecimal(totalValue, 2)} ${currency}`.trim();
+    }
+  }
+
+  table.addEventListener('click', async (event) => {
+    const button = event.target.closest('button[data-action]');
+    if (!button) {
+      return;
+    }
+    const row = button.closest('tr');
+    const id = row?.dataset.id;
+    if (!id) {
+      return;
+    }
+    const action = button.dataset.action;
+    if (action === 'codes') {
+      if (!codeModalInstance) {
+        return;
+      }
+      const label = row.querySelector('.inventory-name')?.textContent?.trim() || button.dataset.internal || '';
+      const internal = button.dataset.internal || label || '';
+      codeModalInstance.open({
+        label,
+        barcodeValue: internal,
+        qrValue: internal
+      });
+    } else if (action === 'quantity') {
+      const currentQuantity = Number(row.dataset.quantity || 0);
+      const input = prompt(t('inventory_quantity_prompt'), currentQuantity);
+      if (input === null) {
+        return;
+      }
+      const nextValue = Number(input);
+      if (!Number.isFinite(nextValue) || nextValue < 0) {
+        alert(t('invalid_remaining'));
+        return;
+      }
+      try {
+        const res = await fetch(`/api/inventory/products/${id}/quantity`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ quantity: nextValue })
+        });
+        if (!res.ok) {
+          throw new Error(`Failed with status ${res.status}`);
+        }
+        const data = await res.json();
+        const qty = Number(data?.item?.quantity ?? nextValue);
+        row.dataset.quantity = qty;
+        const quantityCell = row.querySelector('.inventory-quantity-cell');
+        if (quantityCell) {
+          quantityCell.textContent = qty;
+        }
+        const price = Number(row.dataset.price || 0);
+        const totalCell = row.children[3];
+        if (totalCell) {
+          totalCell.textContent = `${formatInventoryDecimal(price * qty, 2)} ${currency}`.trim();
+        }
+        refreshTotals();
+      } catch (error) {
+        console.error(error);
+        alert(t('update_failed'));
+      }
+    } else if (action === 'archive' || action === 'unarchive') {
+      try {
+        await fetch(`/api/inventory/products/${id}/${action}`, { method: 'POST' });
+        window.location.reload();
+      } catch (error) {
+        console.error(error);
+        alert(t('update_failed'));
+      }
+    } else if (action === 'delete') {
+      if (!confirm(t('confirm_delete'))) {
+        return;
+      }
+      try {
+        const res = await fetch(`/api/inventory/products/${id}`, { method: 'DELETE' });
+        if (!res.ok) {
+          throw new Error(`Delete failed: ${res.status}`);
+        }
+        row.remove();
+        refreshTotals();
+      } catch (error) {
+        console.error(error);
+        alert(t('delete_failed'));
+      }
+    }
+  });
+
+  refreshTotals();
+}
+
+function initInventoryManagerAudit() {
+  const table = document.getElementById('inventory-audit-table');
+  if (!table) {
+    return;
+  }
+  const rows = Array.from(table.querySelectorAll('tbody tr[data-id]'));
+  const totalExpectedEl = document.getElementById('inventory-total-expected');
+  const totalCountedEl = document.getElementById('inventory-total-counted');
+  const totalDiffEl = document.getElementById('inventory-total-diff');
+  const exportBtn = document.getElementById('inventory-audit-export');
+  const scanInput = document.getElementById('inventory-scan-input');
+
+  function normaliseCode(value) {
+    if (!value) {
+      return '';
+    }
+    return value.toString().trim().replace(/\s+/g, '');
+  }
+
+  function setActiveRow(targetRow) {
+    rows.forEach((row) => row.classList.remove('inventory-row--active'));
+    if (!targetRow) {
+      return;
+    }
+    targetRow.classList.add('inventory-row--active');
+    const input = targetRow.querySelector('.inventory-count-input');
+    if (input) {
+      input.focus();
+      input.select();
+    }
+    targetRow.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  }
+
+  function focusRowByCode(code) {
+    const normalized = normaliseCode(code);
+    if (!normalized) {
+      return false;
+    }
+    const targetRow = rows.find((row) => {
+      const ean = normaliseCode(row.dataset.ean);
+      const internal = normaliseCode(row.dataset.internal);
+      return normalized === ean || normalized === internal;
+    });
+    if (targetRow) {
+      setActiveRow(targetRow);
+      return true;
+    }
+    return false;
+  }
+
+  function updateRow(row) {
+    const input = row.querySelector('.inventory-count-input');
+    if (!input) {
+      return;
+    }
+    input.classList.remove('stock-high', 'stock-medium', 'stock-low', 'stock-empty');
+    row.classList.remove('inventory-row--empty');
+    let counted = Number(input.value);
+    if (!Number.isFinite(counted) || counted < 0) {
+      counted = 0;
+    }
+    input.value = counted;
+    row.dataset.counted = counted;
+    const expected = Number(row.dataset.expected || 0);
+    const diffCell = row.querySelector('.inventory-diff');
+    if (diffCell) {
+      const diff = counted - expected;
+      diffCell.textContent = diff > 0 ? `+${diff}` : diff.toString();
+      diffCell.classList.toggle('is-negative', diff < 0);
+      diffCell.classList.toggle('is-positive', diff > 0);
+    }
+    if (counted === 0) {
+      input.classList.add('stock-empty');
+      row.classList.add('inventory-row--empty');
+    } else if (counted <= 3) {
+      input.classList.add('stock-low');
+    } else if (counted <= 7) {
+      input.classList.add('stock-medium');
+    } else if (counted > 7) {
+      input.classList.add('stock-high');
+    }
+  }
+
+  function updateTotals() {
+    let expectedTotal = 0;
+    let countedTotal = 0;
+    rows.forEach((row) => {
+      const expected = Number(row.dataset.expected || 0);
+      const counted = Number(row.dataset.counted ?? expected);
+      expectedTotal += expected;
+      countedTotal += counted;
+    });
+    const diff = countedTotal - expectedTotal;
+    if (totalExpectedEl) {
+      totalExpectedEl.textContent = expectedTotal.toString();
+    }
+    if (totalCountedEl) {
+      totalCountedEl.textContent = countedTotal.toString();
+    }
+    if (totalDiffEl) {
+      totalDiffEl.textContent = diff > 0 ? `+${diff}` : diff.toString();
+      totalDiffEl.classList.toggle('is-negative', diff < 0);
+      totalDiffEl.classList.toggle('is-positive', diff > 0);
+    }
+  }
+
+  rows.forEach((row) => {
+    updateRow(row);
+    const input = row.querySelector('.inventory-count-input');
+    input?.addEventListener('input', () => {
+      updateRow(row);
+      updateTotals();
+    });
+    input?.addEventListener('change', () => {
+      updateRow(row);
+      updateTotals();
+    });
+    input?.addEventListener('focus', () => {
+      setActiveRow(row);
+    });
+  });
+
+  updateTotals();
+
+  scanInput?.addEventListener('keydown', (event) => {
+    if (event.key !== 'Enter') {
+      return;
+    }
+    event.preventDefault();
+    const value = scanInput.value;
+    const found = focusRowByCode(value);
+    scanInput.classList.toggle('input-not-found', !found);
+    if (found) {
+      scanInput.select();
+    }
+  });
+
+  scanInput?.addEventListener('input', () => {
+    scanInput.classList.remove('input-not-found');
+  });
+
+  exportBtn?.addEventListener('click', async () => {
+    if (exportBtn.disabled) {
+      return;
+    }
+    exportBtn.disabled = true;
+    const counts = {};
+    rows.forEach((row) => {
+      const id = row.dataset.id;
+      if (!id) {
+        return;
+      }
+      const counted = Number(row.dataset.counted ?? row.dataset.expected);
+      counts[id] = counted;
+    });
+    try {
+      const res = await fetch('/inventory/export', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ counts })
+      });
+      if (!res.ok) {
+        throw new Error(`Export failed: ${res.status}`);
+      }
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      const today = new Date().toISOString().slice(0, 10);
+      link.href = url;
+      link.download = `inventur_${today}.pdf`;
+      document.body.append(link);
+      link.click();
+      requestAnimationFrame(() => {
+        URL.revokeObjectURL(url);
+        link.remove();
+      });
+    } catch (error) {
+      console.error(error);
+      alert(t('inventory_export_failed'));
+    } finally {
+      exportBtn.disabled = false;
+    }
+  });
+}
+
+function initInventoryManagerForms() {
+  const forms = document.querySelectorAll('[data-inventory-form]');
+  if (!forms.length) {
+    return;
+  }
+  forms.forEach((form) => {
+    const autoFetchCheckbox = form.querySelector('input[name="autoFetchImage"]');
+    const eanInput = form.querySelector('input[name="ean"]');
+    eanInput?.addEventListener('input', () => {
+      if (autoFetchCheckbox && !autoFetchCheckbox.disabled) {
+        autoFetchCheckbox.checked = true;
+      }
+    });
+
+    form.addEventListener('keydown', (event) => {
+      if (event.key !== 'Enter') {
+        return;
+      }
+      const target = event.target;
+      if (!(target instanceof HTMLElement)) {
+        return;
+      }
+      const tagName = target.tagName.toLowerCase();
+      if (tagName === 'textarea') {
+        return; // allow line breaks in textareas
+      }
+      if (target.getAttribute('type') === 'submit' || target.getAttribute('type') === 'button') {
+        return;
+      }
+
+      const focusable = Array.from(
+        form.querySelectorAll(
+          [
+            'input:not([type="hidden"]):not([type="submit"]):not([type="button"])',
+            'select',
+            'textarea'
+          ].join(',')
+        )
+      ).filter((element) => {
+        if (!(element instanceof HTMLElement)) {
+          return false;
+        }
+        if (element.hasAttribute('disabled') || element.getAttribute('aria-hidden') === 'true') {
+          return false;
+        }
+        if (element.getAttribute('type') === 'hidden') {
+          return false;
+        }
+        if (!element.offsetParent && element !== document.activeElement) {
+          return false;
+        }
+        return true;
+      });
+
+      const index = focusable.indexOf(target);
+      if (index === -1) {
+        return;
+      }
+
+      event.preventDefault();
+      const next = focusable[index + 1];
+      if (next && typeof next.focus === 'function') {
+        next.focus();
+        if ('select' in next && typeof next.select === 'function' && next.tagName.toLowerCase() !== 'select') {
+          next.select();
+        }
+      }
+    });
   });
 }
 
@@ -1294,7 +1900,18 @@ function initDetailPage() {
       return;
     }
     const action = button.dataset.action;
-    if (action === 'restock') {
+    if (action === 'codes') {
+      if (!codeModalInstance) {
+        return;
+      }
+      const title = document.querySelector('.panel__title h1')?.textContent?.trim() || id;
+      const origin = window.location.origin || `${window.location.protocol}//${window.location.host}`;
+      codeModalInstance.open({
+        label: title,
+        barcodeValue: id,
+        qrValue: `${origin}/filaments/${id}`
+      });
+    } else if (action === 'restock') {
       await fetch(`/api/filaments/${id}/restock`, { method: 'POST' });
       window.open(`/print/label/${id}`, '_blank');
       location.reload();
@@ -1362,6 +1979,10 @@ function initGcodePage() {
   const filamentRemaining = document.getElementById('gcode-filament-remaining');
   const printLabel = document.getElementById('gcode-print-label');
 
+  if (printLabel) {
+    printLabel.hidden = true;
+  }
+
   form.addEventListener('submit', async (event) => {
     event.preventDefault();
     const formData = new FormData(form);
@@ -1390,9 +2011,27 @@ function initGcodePage() {
       filamentBox.hidden = false;
       filamentName.textContent = data.filament.name;
       filamentRemaining.textContent = formatNumber(data.filament.remainingG);
-      printLabel.href = `/print/label/${data.filament.id}`;
+      if (codeModalInstance && printLabel) {
+        const origin = window.location.origin || `${window.location.protocol}//${window.location.host}`;
+        bindClick(printLabel, () => {
+          codeModalInstance.open({
+            label: data.filament.name,
+            barcodeValue: data.filament.id,
+            qrValue: `${origin}/filaments/${data.filament.id}`
+          });
+        });
+      } else if (printLabel) {
+        printLabel.hidden = true;
+      }
     } else {
       filamentBox.hidden = true;
+      if (printLabel) {
+        if (printLabel.__boundHandler) {
+          printLabel.removeEventListener('click', printLabel.__boundHandler);
+          printLabel.__boundHandler = null;
+        }
+        printLabel.hidden = true;
+      }
     }
   });
 }
@@ -1412,12 +2051,172 @@ function formatNumber(value) {
   return Number(value).toFixed(2);
 }
 
+function initSettingsPage() {
+  const form = document.querySelector('[data-settings-form]');
+  if (!form) {
+    return;
+  }
+  initSettingsAreaManager(form);
+  const searchInput = form.querySelector('[data-settings-search]');
+  const cards = Array.from(form.querySelectorAll('[data-settings-card]'));
+  const groups = Array.from(form.querySelectorAll('[data-settings-group]'));
+  const warning = form.querySelector('[data-settings-warning]');
+  const cardTextMap = new Map();
+  cards.forEach((card) => {
+    cardTextMap.set(card, card.textContent.toLowerCase());
+  });
+
+  function toggleWarning(hasChanges) {
+    if (!warning) {
+      return;
+    }
+    warning.hidden = !hasChanges;
+  }
+
+  let hasChanges = false;
+  const markChanged = () => {
+    if (!hasChanges) {
+      hasChanges = true;
+      toggleWarning(true);
+    }
+  };
+
+  form.addEventListener('input', (event) => {
+    const target = event.target;
+    if (target instanceof HTMLElement && target.closest('[data-settings-form]')) {
+      if (target.matches('[data-area-input], [data-area-add], [data-area-remove]')) {
+        markChanged();
+        return;
+      }
+      if (target.closest('[data-settings-card]')) {
+        markChanged();
+      }
+    }
+  });
+
+  window.addEventListener('beforeunload', (event) => {
+    if (!hasChanges) {
+      return;
+    }
+    const message = form.dataset.leaveWarning || 'Unsaved changes';
+    event.preventDefault();
+    event.returnValue = message;
+    return message;
+  });
+
+  form.addEventListener('submit', () => {
+    hasChanges = false;
+    toggleWarning(false);
+  });
+}
+
+function initSettingsAreaManager(form) {
+  const manager = form.querySelector('[data-area-manager]');
+  if (!manager) {
+    return;
+  }
+  const input = manager.querySelector('[data-area-input]');
+  const addButton = manager.querySelector('[data-area-add]');
+  const list = manager.querySelector('[data-area-list]');
+  const hidden = manager.querySelector('[data-area-hidden]');
+  const emptyText = list?.dataset.emptyText || '';
+
+  const normalise = (value) => value?.toString().trim() || '';
+  let areas = (hidden?.value || '')
+    .split(/\r?\n/)
+    .map(normalise)
+    .filter(Boolean);
+
+  areas = Array.from(new Set(areas.map((value) => value.trim())));
+
+  function render() {
+    if (!list) {
+      return;
+    }
+    list.innerHTML = '';
+    if (!areas.length) {
+      if (emptyText) {
+        const emptyEl = document.createElement('p');
+        emptyEl.className = 'settings-area-empty';
+        emptyEl.textContent = emptyText;
+        list.append(emptyEl);
+      }
+      return;
+    }
+    areas.forEach((area) => {
+      const chip = document.createElement('span');
+      chip.className = 'settings-area-chip';
+      chip.dataset.areaItem = '1';
+
+      const label = document.createElement('span');
+      label.className = 'settings-area-chip__label';
+      label.textContent = area;
+      chip.append(label);
+
+      const remove = document.createElement('button');
+      remove.type = 'button';
+      remove.className = 'settings-area-chip__remove';
+      remove.dataset.areaRemove = '1';
+      remove.textContent = '×';
+      remove.setAttribute('aria-label', 'remove area');
+      remove.addEventListener('click', () => {
+        areas = areas.filter((value) => value !== area);
+        render();
+      });
+      chip.append(remove);
+      list.append(chip);
+    });
+  }
+
+  function addArea(value) {
+    const name = normalise(value);
+    if (!name || areas.includes(name)) {
+      return;
+    }
+    areas.push(name);
+    areas.sort((a, b) => a.localeCompare(b));
+    render();
+  }
+
+  addButton?.addEventListener('click', () => {
+    addArea(input?.value || '');
+    if (input) {
+      input.value = '';
+      input.focus();
+    }
+  });
+
+  input?.addEventListener('keydown', (event) => {
+    if (event.key !== 'Enter') {
+      return;
+    }
+    event.preventDefault();
+    addArea(input.value);
+    input.value = '';
+  });
+
+  form.addEventListener('submit', () => {
+    if (hidden) {
+      hidden.value = areas.join('\n');
+    }
+  });
+
+  render();
+}
+
 ready(() => {
+  codeModalInstance = createCodeModal();
+  initLandingPage();
   initListPage();
   initCreateForm();
   initEditForm();
   initDetailPage();
   initGcodePage();
   initInventoryPage();
+  initInventoryManagerOverview();
+  initInventoryManagerAudit();
+  initInventoryManagerForms();
+  initSettingsPage();
+  initSettingsAreaManager(document.querySelector('[data-settings-form]'));
 });
 

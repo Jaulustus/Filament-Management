@@ -9,23 +9,29 @@
 <body data-lang="{{lang}}" data-length-unit="{{ui.form.units.length}}" data-weight-unit="{{ui.form.units.weight}}" data-currency="{{ui.form.currency}}">
   <header class="topbar">
     <div class="topbar__title">
-      <a href="/">{{t 'app_title'}}</a>
+      {{#if topbarLogoKey}}
+        <span class="topbar__logo">{{t topbarLogoKey}}</span>
+        {{#unless (eq topbarLogoKey topbarBrandKey)}}
+          <a href="/">{{t topbarBrandKey}}</a>
+        {{/unless}}
+      {{else}}
+        <a href="/">{{t topbarBrandKey}}</a>
+      {{/if}}
     </div>
     <nav class="topbar__nav">
-      <a href="/">{{t 'menu_home'}}</a>
-      <a href="/filaments/new">{{t 'menu_new'}}</a>
-      <a href="/inventory">{{t 'menu_inventory'}}</a>
-      <a href="/upload-gcode">{{t 'menu_upload'}}</a>
-      <a href="/settings">{{t 'menu_settings'}}</a>
+      {{#each navLinks}}
+        <a href="{{this.href}}">{{t this.labelKey}}</a>
+      {{/each}}
     </nav>
     <div class="topbar__actions">
-      <div class="topbar__language">
-        <span>{{t 'language'}}:</span>
-        {{#each languages}}
-          <a class="lang-link {{#if (eq ../lang this)}}active{{/if}}" href="?lang={{this}}">{{uppercase this}}</a>
-        {{/each}}
-      </div>
-      <a class="topbar__add" href="/filaments/new" aria-label="{{t 'menu_new'}}">+</a>
+      {{#if showLanguageSwitcher}}
+        <div class="topbar__language">
+          <span>{{t 'language'}}:</span>
+          {{#each languages}}
+            <a class="lang-link {{#if (eq ../lang this)}}active{{/if}}" href="?lang={{this}}">{{uppercase this}}</a>
+          {{/each}}
+        </div>
+      {{/if}}
     </div>
   </header>
 
@@ -33,9 +39,53 @@
     {{{body}}}
   </main>
 
+  <div class="modal-backdrop" id="code-modal-backdrop" hidden></div>
+  <div class="modal" id="code-modal" hidden role="dialog" aria-modal="true" aria-labelledby="code-modal-title">
+    <div class="modal__dialog">
+      <button type="button" class="modal__close" data-modal-close aria-label="{{t 'modal_close'}}">×</button>
+      <header class="modal__header">
+        <h2 id="code-modal-title">{{t 'modal_codes_title'}}</h2>
+        <p class="modal__subtitle">{{t 'modal_codes_subtitle'}}</p>
+      </header>
+      <div class="modal__controls" role="group" aria-label="{{t 'modal_codes_filter_label'}}">
+        <button type="button" class="btn btn--ghost btn--small is-active" data-code-filter="both">{{t 'modal_codes_filter_both'}}</button>
+        <button type="button" class="btn btn--ghost btn--small" data-code-filter="barcode">{{t 'modal_codes_filter_barcode'}}</button>
+        <button type="button" class="btn btn--ghost btn--small" data-code-filter="qr">{{t 'modal_codes_filter_qr'}}</button>
+      </div>
+      <div class="modal__body">
+        <div class="code-preview" data-code-block="barcode">
+          <img data-barcode src="" alt="{{t 'modal_barcode_alt'}}">
+          <span class="code-preview__label">{{t 'barcode'}}</span>
+        </div>
+        <div class="code-preview" data-code-block="qr">
+          <img data-qr src="" alt="{{t 'modal_qr_alt'}}">
+          <span class="code-preview__label">{{t 'qrcode'}}</span>
+        </div>
+      </div>
+      <footer class="modal__footer">
+        <button type="button" class="btn" data-modal-print>{{t 'modal_codes_print'}}</button>
+      </footer>
+    </div>
+  </div>
+
+  <script id="translations-data" type="application/json">
+    {{{json translationStrings}}}
+  </script>
   <script>
     window.__LANG__ = "{{lang}}";
-    window.__T__ = {{{json translationStrings}}};
+    (function () {
+      const node = document.getElementById('translations-data');
+      if (!node) {
+        window.__T__ = {};
+        return;
+      }
+      try {
+        window.__T__ = JSON.parse(node.textContent || '{}');
+      } catch (error) {
+        console.warn('Failed to parse translations', error);
+        window.__T__ = {};
+      }
+    })();
   </script>
   <script src="/js/app.js" defer></script>
 </body>

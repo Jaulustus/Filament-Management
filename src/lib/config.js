@@ -7,6 +7,8 @@ export const defaultConfig = {
   currency: 'EUR',
   lengthUnit: 'mm',
   weightUnit: 'g',
+  inventoryAreas: [],
+  includeFilamentsInInventoryReport: false,
   requiredFields: {
     name: true,
     manufacturer: true,
@@ -64,6 +66,9 @@ function mergeWithDefaults(config) {
     ...defaultConfig.labelSizes,
     ...(config.labelSizes || {})
   };
+  merged.inventoryAreas = Array.isArray(config.inventoryAreas)
+    ? config.inventoryAreas.filter((value) => typeof value === 'string' && value.trim().length)
+    : [];
   return merged;
 }
 
@@ -111,6 +116,9 @@ export function buildUiMeta(config, fieldDefs = []) {
         required: requiredList,
         optional: optionalList
       },
+      inventoryAreas: Array.isArray(config.inventoryAreas)
+        ? config.inventoryAreas.filter((value) => typeof value === 'string' && value.trim().length)
+        : [],
       labelSizes: {
         barcodeWidth: convertLength(labelSizes.barcodeWidthMm),
         barcodeHeight: convertLength(labelSizes.barcodeHeightMm),

@@ -8,7 +8,7 @@
       <h1>{{filament.name}}</h1>
       <div class="panel__actions">
         <a class="btn btn--ghost" href="/filaments/{{filament.id}}/edit">{{t 'edit_filament'}}</a>
-        <a class="btn" href="/print/label/{{filament.id}}" target="_blank">{{t 'reprint_label'}}</a>
+        <button class="btn btn--ghost" type="button" data-action="codes">{{t 'modal_codes_button'}}</button>
         <button class="btn" type="button" data-action="duplicate">{{t 'duplicate'}}</button>
         {{#if filament.archived}}
           <button class="btn" data-action="unarchive">{{t 'unarchive'}}</button>

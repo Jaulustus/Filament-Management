@@ -91,7 +91,7 @@ function normaliseCount(value) {
   return Math.round(num);
 }
 
-router.get('/', async (req, res, next) => {
+router.get('/filament-overview', async (req, res, next) => {
   try {
     const showArchived = req.query.archived === '1';
     const items = await prisma(req).filament.findMany({
@@ -100,7 +100,12 @@ router.get('/', async (req, res, next) => {
     });
     const filaments = items.map((item) => serializeFilament(item));
     const totalQuantity = filaments.reduce((sum, item) => sum + (Number(item.quantity) || 0), 0);
-    res.render('index', { filaments, showArchived, ui: req.app.locals.ui, totalQuantity });
+    res.render('filament_overview', {
+      filaments,
+      showArchived,
+      ui: req.app.locals.ui,
+      totalQuantity
+    });
   } catch (error) {
     next(error);
   }

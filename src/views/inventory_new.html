@@ -1,0 +1,76 @@
+<section class="panel" data-page="inventory-new">
+  <header class="panel__title">
+    <h1>{{t 'inventory_new_title'}}</h1>
+    <div class="panel__actions">
+      <a class="btn btn--ghost" href="/inventory-overview">{{t 'inventory_back_to_overview'}}</a>
+    </div>
+  </header>
+
+  {{#if error}}
+    <div class="alert alert--error">
+      {{t error}}
+    </div>
+  {{/if}}
+
+  <form class="form" action="/products" method="post" enctype="multipart/form-data" data-inventory-form>
+    <div class="form__grid">
+      <label>
+        <span>{{t 'inventory_product_name'}} <span class="required-flag">*</span></span>
+        <input type="text" name="name" value="{{form.name}}" required autofocus>
+      </label>
+      <label>
+        <span>{{t 'inventory_product_ean'}}</span>
+        <input type="text" name="ean" value="{{form.ean}}" placeholder="{{t 'inventory_product_ean_placeholder'}}">
+        <small class="form__hint">{{t 'inventory_product_ean_hint'}}</small>
+      </label>
+      <label>
+        <span>{{t 'inventory_area_label'}}</span>
+        <select name="area">
+          <option value="">{{t 'inventory_area_select_prompt'}}</option>
+          {{#each areas}}
+            <option value="{{this}}" {{#if (eq ../form.area this)}}selected{{/if}}>{{this}}</option>
+          {{/each}}
+        </select>
+        <small class="form__hint">{{t 'inventory_area_hint'}}</small>
+      </label>
+      <label>
+        <span>{{t 'inventory_unit_price'}} ({{currency}})</span>
+        <input type="number" step="0.01" min="0" name="unitPrice" value="{{form.unitPrice}}">
+      </label>
+      <label>
+        <span>{{t 'inventory_quantity'}}</span>
+        <input type="number" step="1" min="0" name="quantity" value="{{#if form.quantity}}{{form.quantity}}{{else}}0{{/if}}">
+      </label>
+      <label class="full">
+        <span>{{t 'inventory_special_note'}}</span>
+        <input type="text" name="specialNote" value="{{form.specialNote}}" placeholder="{{t 'inventory_special_note_placeholder'}}">
+      </label>
+      <label class="full">
+        <span>{{t 'inventory_internal_code_optional'}}</span>
+        <input type="text" name="internalCode" value="{{form.internalCode}}" placeholder="{{t 'inventory_internal_code_placeholder'}}">
+        <small class="form__hint">{{t 'inventory_internal_code_hint'}}</small>
+      </label>
+      <fieldset class="full">
+        <legend>{{t 'inventory_image_section'}}</legend>
+        <label>
+          <span>{{t 'inventory_image_upload'}}</span>
+          <input type="file" name="imageFile" accept="image/*">
+        </label>
+        <label>
+          <span>{{t 'inventory_image_url'}}</span>
+          <input type="url" name="imageUrl" value="{{form.imageUrl}}" placeholder="https://">
+        </label>
+        <label class="checkbox">
+          <input type="checkbox" name="autoFetchImage" value="1" {{#if autoFetch}}checked{{/if}}>
+          <span>{{t 'inventory_image_autofetch'}}</span>
+        </label>
+        <small class="form__hint">{{t 'inventory_image_hint'}}</small>
+      </fieldset>
+    </div>
+    <footer class="form__actions">
+      <button type="submit" class="btn">{{t 'inventory_save_product'}}</button>
+      <a class="btn btn--ghost" href="/inventory-overview">{{t 'inventory_cancel'}}</a>
+    </footer>
+  </form>
+</section>
+

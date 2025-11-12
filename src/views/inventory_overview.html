@@ -1,0 +1,122 @@
+<section class="panel" data-page="inventory-overview">
+  <header class="panel__title">
+    <h1>{{t 'inventory_overview_title'}}</h1>
+    <div class="panel__actions">
+      <a class="btn btn--ghost" href="/">{{t 'landing_back_button'}}</a>
+      <a class="btn" href="/products/new">{{t 'inventory_button_new_product'}}</a>
+    </div>
+  </header>
+
+  <div class="inventory-summary">
+    <div class="inventory-summary__item">
+      <span>{{t 'inventory_total_quantity'}}</span>
+      <strong id="inventory-total-quantity">{{totals.totalQuantity}}</strong>
+    </div>
+    <div class="inventory-summary__item">
+      <span>{{t 'inventory_total_value'}}</span>
+      <strong id="inventory-total-value">{{formatDecimal totals.totalValue 2}} {{config.currency}}</strong>
+    </div>
+  </div>
+
+  <div class="panel__toolbar">
+    <form class="toolbar-form" method="get" action="/inventory-overview">
+      <label class="toggle">
+        <input type="checkbox" name="archived" value="1" {{#if showArchived}}checked{{/if}} onchange="this.form.submit()">
+        <span>{{t 'inventory_show_archived'}}</span>
+      </label>
+      {{#if areas.length}}
+        <label class="toolbar-select">
+          <span>{{t 'inventory_area_filter'}}</span>
+          <select name="area" onchange="this.form.submit()">
+            <option value="">{{t 'inventory_area_filter_all'}}</option>
+            {{#each areas}}
+              <option value="{{this}}" {{#if (eq ../activeArea this)}}selected{{/if}}>{{this}}</option>
+            {{/each}}
+          </select>
+        </label>
+      {{/if}}
+    </form>
+  </div>
+
+  <div class="table-wrapper" data-inventory-overview>
+    <table class="data-table" id="inventory-products-table" data-currency="{{currency}}">
+      <thead>
+        <tr>
+          <th>{{t 'inventory_product_image'}}</th>
+          <th>{{t 'inventory_product_name'}}</th>
+          <th>{{t 'inventory_area_column'}}</th>
+          <th>{{t 'inventory_product_ean'}}</th>
+          <th>{{t 'inventory_unit_price'}}</th>
+          <th>{{t 'inventory_total_price'}}</th>
+          <th>{{t 'inventory_quantity'}}</th>
+          <th>{{t 'inventory_actions'}}</th>
+        </tr>
+      </thead>
+      <tbody>
+        {{#if items.length}}
+          {{#each items}}
+            <tr
+              data-id="{{this.id}}"
+              data-quantity="{{this.quantity}}"
+              data-price="{{formatDecimal this.unitPriceNumber 2}}"
+              data-area="{{this.area}}"
+            >
+              <td class="inventory-image-cell">
+                {{#if this.hasImage}}
+                  <div class="inventory-thumb">
+                    <img src="{{#if this.imageFile}}{{this.imageFile}}{{else}}{{this.imageUrl}}{{/if}}" alt="{{this.name}}">
+                  </div>
+                {{else}}
+                  <span class="inventory-thumb--placeholder">—</span>
+                {{/if}}
+              </td>
+              <td>
+                <div class="inventory-name">{{this.name}}</div>
+                {{#if this.specialNote}}
+                  <div class="inventory-meta">{{this.specialNote}}</div>
+                {{/if}}
+                {{#if this.hasImage}}
+                  <div class="inventory-meta">
+                    <a href="{{#if this.imageUrl}}{{this.imageUrl}}{{else}}{{this.imageFile}}{{/if}}" target="_blank" rel="noopener">{{t 'inventory_view_image'}}</a>
+                  </div>
+                {{/if}}
+              </td>
+              <td>{{#if this.area}}{{this.area}}{{else}}—{{/if}}</td>
+              <td>
+                {{#if this.displayEan}}
+                  <div>{{this.displayEan}}</div>
+                {{else}}
+                  <div>{{t 'inventory_no_ean_label'}}</div>
+                {{/if}}
+                <div class="inventory-meta">
+                  <span>{{t 'inventory_internal_code'}}: {{this.internalCode}}</span>
+                </div>
+              </td>
+              <td>{{formatDecimal this.unitPriceNumber 2}} {{../currency}}</td>
+              <td>{{formatDecimal this.totalValueNumber 2}} {{../currency}}</td>
+              <td class="inventory-quantity-cell">{{this.quantity}}</td>
+              <td>
+                <div class="table-actions">
+                  <a class="btn btn--ghost" href="/products/{{this.id}}/edit">{{t 'inventory_edit_button'}}</a>
+                  <button class="btn btn--ghost" data-action="codes" data-internal="{{this.internalCode}}">{{t 'modal_codes_button'}}</button>
+                  <button class="btn btn--ghost" data-action="quantity">{{t 'inventory_change_quantity'}}</button>
+                  {{#if this.archived}}
+                    <button class="btn" data-action="unarchive">{{t 'inventory_unarchive'}}</button>
+                  {{else}}
+                    <button class="btn btn--ghost" data-action="archive">{{t 'inventory_archive'}}</button>
+                  {{/if}}
+                  <button class="btn btn--danger" data-action="delete">{{t 'inventory_delete'}}</button>
+                </div>
+              </td>
+            </tr>
+          {{/each}}
+        {{else}}
+          <tr>
+            <td colspan="6">{{t 'inventory_no_items'}}</td>
+          </tr>
+        {{/if}}
+      </tbody>
+    </table>
+  </div>
+</section>
+
