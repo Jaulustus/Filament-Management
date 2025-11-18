@@ -6,10 +6,8 @@
 #define MyAppVersion "1.1.0"
 #define MyAppPublisher "Jaulustus"
 #define MyAppExeName "FilaHub.exe"
-#define MyAppURL "https://github.com/YOUR_USERNAME/FilaHub"
-; AKTUALISIERE DIESE URL MIT DEINER GITHUB REPOSITORY URL!
-; Beispiel: #define GitHubReleaseURL "https://github.com/DEIN_USERNAME/FilaHub/releases/download/v1.1.0"
-#define GitHubReleaseURL "https://github.com/YOUR_USERNAME/FilaHub/releases/download/v{#MyAppVersion}"
+#define MyAppURL "https://github.com/Jaulustus/Filament-Management"
+#define GitHubReleaseURL "https://github.com/Jaulustus/Filament-Management/releases/download/v{#MyAppVersion}"
 #define NodeInstallerX64 "dependencies\node-v24.11.1-x64.msi"
 
 #ifexist {#NodeInstallerX64}
