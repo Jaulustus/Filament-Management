@@ -1,0 +1,17 @@
+FilaHub – Lizenzhinweis
+========================
+
+Dies ist ein Platzhalter für deinen Lizenztext. 
+Bitte ersetze den Inhalt durch die gültigen Nutzungsbedingungen
+bevor du den Installer veröffentlichst.
+
+Empfohlener Aufbau:
+- Eigentümer / Copyright
+- Lizenztyp (z. B. Proprietary, MIT, GPL …)
+- Nutzungsrechte / Einschränkungen
+- Haftungsausschluss
+
+Durch Klicken auf „Weiter" im Setup akzeptieren Anwender diese Bedingungen.
+
+Copyright (c) 2025 Jaulustus
+

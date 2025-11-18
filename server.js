@@ -20,7 +20,10 @@ const __dirname = path.dirname(__filename);
 const prisma = new PrismaClient();
 
 const app = express();
-const PORT = process.env.PORT || 3000;
+// Versuche Port 80, falls nicht verfügbar (z.B. keine Admin-Rechte) → Port 3000
+const DEFAULT_PORT = process.env.PORT ? parseInt(process.env.PORT) : 80;
+const FALLBACK_PORT = 3000;
+const HOST = process.env.HOST || '0.0.0.0'; // Hört auf allen Interfaces für Netzwerk-Zugriff
 const APP_MODE = (process.env.APP_MODE || 'both').toLowerCase();
 const FILAMENT_ENABLED = APP_MODE === 'both' || APP_MODE === 'filament';
 const INVENTORY_ENABLED = APP_MODE === 'both' || APP_MODE === 'inventur';
@@ -322,6 +325,8 @@ app.use(bodyParser.urlencoded({ extended: true }));
 app.use(bodyParser.json());
 app.use(express.static(publicPath));
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
+// Icons für Favicon bereitstellen
+app.use('/assets/icons', express.static(path.join(__dirname, 'assets', 'icons')));
 
 const filamentPathPrefixes = ['/filament', '/filaments', '/upload-gcode', '/gcode', '/print'];
 const inventoryPathPrefixes = ['/inventory-overview', '/inventory', '/inventory-audit', '/products'];
@@ -648,9 +653,36 @@ app.use((err, req, res, next) => {
   }
 });
 
-app.listen(PORT, () => {
-  console.log(`Server listening on http://localhost:${PORT}`);
-});
+// Versuche zuerst Port 80, falls fehlgeschlagen → Port 3000
+function startServer(port) {
+  const server = app.listen(port, HOST, () => {
+    const portDisplay = port === 80 ? '' : `:${port}`;
+    console.log(`Server listening on http://localhost${portDisplay}`);
+    console.log(`Server accessible in network on http://<your-ip>${portDisplay}`);
+  });
+
+  server.on('error', (error) => {
+    if (error.code === 'EACCES' || error.code === 'EADDRINUSE') {
+      // Port 80 nicht verfügbar (keine Rechte oder bereits belegt)
+      if (port === DEFAULT_PORT && port !== FALLBACK_PORT) {
+        console.log(`\n⚠ Port ${port} nicht verfügbar (möglicherweise keine Admin-Rechte oder Port belegt)`);
+        console.log(`→ Wechsle auf Port ${FALLBACK_PORT}...\n`);
+        startServer(FALLBACK_PORT);
+      } else {
+        console.error(`\n❌ Fehler: Port ${port} ist nicht verfügbar!`);
+        console.error(`Bitte wähle einen anderen Port in der .env Datei (PORT=XXXX)`);
+        process.exit(1);
+      }
+    } else {
+      console.error('Server-Fehler:', error);
+      process.exit(1);
+    }
+  });
+
+  return server;
+}
+
+startServer(DEFAULT_PORT);
 
 process.on('SIGINT', async () => {
   await prisma.$disconnect();

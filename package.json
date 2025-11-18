@@ -1,14 +1,16 @@
 {
-  "name": "filament-inventory",
-  "version": "1.0.0",
-  "description": "Lokale Filament-Inventarverwaltung mit Express, Prisma und SQLite",
+  "name": "filahub",
+  "version": "1.1.0",
+  "description": "FilaHub - Filament Management & Inventory System",
   "main": "server.js",
   "type": "module",
   "scripts": {
     "dev": "nodemon server.js",
     "start": "node server.js",
+    "startup": "node startup.js",
     "prisma:generate": "prisma generate",
-    "prisma:migrate": "prisma migrate dev"
+    "prisma:migrate": "prisma migrate dev",
+    "build:exe": "pkg startup.js --targets node18-win-x64 --output FilaHub.exe --icon assets/icons/Filahub256.png"
   },
   "keywords": [
     "filament",
@@ -32,7 +34,19 @@
   },
   "devDependencies": {
     "nodemon": "^3.0.2",
-    "prisma": "^5.11.0"
+    "prisma": "^5.11.0",
+    "pkg": "^5.8.1"
+  },
+  "pkg": {
+    "assets": [
+      "prisma/**/*",
+      "src/**/*",
+      "lang/**/*",
+      ".env.example"
+    ],
+    "scripts": [
+      "server.js"
+    ]
   }
 }
 

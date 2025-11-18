@@ -1,0 +1,99 @@
+<section class="panel" data-page="inventory-audit">
+  <header class="panel__title">
+    <h1>{{t 'inventory_audit_title'}}</h1>
+    <div class="panel__actions">
+      <button type="button" class="btn" id="inventory-audit-export">{{t 'inventory_export'}}</button>
+    </div>
+  </header>
+  <p class="form__hint">{{t 'inventory_audit_hint'}}</p>
+
+  <div class="inventory-audit__toolbar">
+    <label>
+      <span>{{t 'inventory_scan_label'}}</span>
+      <input type="text" id="inventory-scan-input" placeholder="{{t 'inventory_scan_placeholder'}}" autocomplete="off">
+    </label>
+  </div>
+
+  <div class="table-wrapper">
+    <table class="data-table" id="inventory-audit-table">
+      <thead>
+        <tr>
+          <th>{{t 'inventory_product_name'}}</th>
+          <th>{{t 'inventory_product_image'}}</th>
+          <th>{{t 'inventory_product_ean'}}</th>
+          <th>{{t 'inventory_quantity_expected'}}</th>
+          <th>{{t 'inventory_quantity_counted'}}</th>
+          <th>{{t 'inventory_difference'}}</th>
+        </tr>
+      </thead>
+      <tbody>
+        {{#if items.length}}
+          {{#each items}}
+            <tr data-id="{{this.id}}" data-expected="{{this.quantity}}" data-ean="{{this.displayEan}}" data-internal="{{this.internalCode}}">
+              <td>
+                <div class="inventory-name">{{this.name}}</div>
+                {{#if this.area}}
+                  <div class="inventory-meta">{{t 'inventory_area_column'}}: {{this.area}}</div>
+                {{/if}}
+                {{#if this.specialNote}}
+                  <div class="inventory-meta">{{this.specialNote}}</div>
+                {{/if}}
+              </td>
+              <td class="inventory-image-cell">
+                {{#if this.hasImage}}
+                  <div class="inventory-thumb">
+                    <img src="{{#if this.imageFile}}{{this.imageFile}}{{else}}{{this.imageUrl}}{{/if}}" alt="{{this.name}}">
+                  </div>
+                {{else}}
+                  <span class="inventory-thumb--placeholder">—</span>
+                {{/if}}
+              </td>
+              <td>
+                {{#if this.displayEan}}
+                  {{this.displayEan}}
+                {{else}}
+                  {{t 'inventory_no_ean_label'}}
+                {{/if}}
+              </td>
+              <td class="inventory-expected">{{this.quantity}}</td>
+              <td>
+                <input
+                  type="number"
+                  min="0"
+                  step="1"
+                  class="inventory-count-input"
+                  value="{{this.quantity}}"
+                  aria-label="{{t 'inventory_counted'}} - {{this.name}}"
+                >
+              </td>
+              <td class="inventory-diff">0</td>
+            </tr>
+          {{/each}}
+        {{else}}
+          <tr>
+            <td colspan="5">{{t 'inventory_no_items'}}</td>
+          </tr>
+        {{/if}}
+      </tbody>
+    </table>
+  </div>
+
+  <div class="inventory-summary">
+    <div class="inventory-summary__item">
+      <span>{{t 'inventory_total_expected'}}</span>
+      <strong id="inventory-total-expected">{{totals.totalExpected}}</strong>
+    </div>
+    <div class="inventory-summary__item">
+      <span>{{t 'inventory_total_counted'}}</span>
+      <strong id="inventory-total-counted">{{totals.totalExpected}}</strong>
+    </div>
+    <div class="inventory-summary__item">
+      <span>{{t 'inventory_total_difference'}}</span>
+      <strong id="inventory-total-diff">0</strong>
+    </div>
+  </div>
+  {{#if includeFilamentsInReport}}
+    <p class="form__hint inventory-note">{{t 'inventory_filament_notice'}}</p>
+  {{/if}}
+</section>
+

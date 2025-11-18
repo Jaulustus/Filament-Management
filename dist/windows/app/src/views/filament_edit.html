@@ -1,0 +1,136 @@
+<section class="panel">
+  <header class="panel__title">
+    <h1>{{t 'edit_filament'}} – {{filament.name}}</h1>
+    <div class="panel__actions">
+      <a class="btn btn--ghost" href="/filaments/{{filament.id}}">{{t 'back_to_detail'}}</a>
+    </div>
+  </header>
+
+  <form id="filament-edit-form" class="form" data-id="{{filament.id}}" data-color-config='{{{json filament.colorConfig}}}' data-colors-required="{{#if ui.form.requiredFields.colorsHex}}true{{else}}false{{/if}}">
+    <div class="form__grid">
+      <label>
+        <span>{{t 'name'}}</span>
+        <input type="text" name="name" value="{{filament.name}}" readonly class="input--readonly">
+      </label>
+      <label>
+        <span>{{t 'manufacturer'}}</span>
+        <input type="text" name="manufacturer" value="{{filament.manufacturer}}" readonly class="input--readonly">
+      </label>
+      <label>
+        <span>{{t 'material'}}</span>
+        <input type="text" name="material" value="{{filament.material}}" readonly class="input--readonly">
+      </label>
+      <label>
+        <span>{{t 'price_new'}} ({{ui.form.currency}})</span>
+        <input type="number" step="0.01" name="priceNewEUR" value="{{formatDecimal filament.priceNewEUR 2}}">
+      </label>
+      <label>
+        <span>{{t 'net_weight'}} ({{ui.form.units.weight}})</span>
+        <input type="number" step="0.01" name="netWeightG" value="{{formatWeight filament.netWeightG ui.form.units.weight}}">
+      </label>
+      <label>
+        <span>{{t 'remaining'}} ({{ui.form.units.weight}})</span>
+        <input type="number" step="0.01" name="remainingG" value="{{formatWeight filament.remainingG ui.form.units.weight}}">
+      </label>
+      <div class="colors-field full" role="group" aria-labelledby="colors-heading-edit">
+        <span id="colors-heading-edit">{{t 'colors'}} {{#if ui.form.requiredFields.colorsHex}}<span class="required-flag">*</span>{{else}}<span class="optional-flag">{{t 'optional'}}</span>{{/if}}</span>
+        <span class="form__hint">{{t 'colors_hint'}}</span>
+        <div class="color-config">
+          <div class="color-options" id="color-options">
+            <span class="color-options__title">{{t 'color_settings'}}</span>
+            <label class="checkbox">
+              <input type="checkbox" id="color-option-normal">
+              <span>{{t 'color_option_normal'}}</span>
+            </label>
+            <label class="checkbox">
+              <input type="checkbox" id="color-option-glow">
+              <span>{{t 'color_option_glow'}}</span>
+            </label>
+            <label class="checkbox">
+              <input type="checkbox" id="color-option-multicolor">
+              <span>{{t 'color_option_multicolor'}}</span>
+            </label>
+            <label class="checkbox">
+              <input type="checkbox" id="color-option-neon">
+              <span>{{t 'color_option_neon'}}</span>
+            </label>
+            <label class="checkbox">
+              <input type="checkbox" id="color-option-transparent">
+              <span>{{t 'color_option_transparent'}}</span>
+            </label>
+          </div>
+          <div class="color-panels">
+            <div class="color-panel" id="color-panel-normal" hidden>
+              <div class="color-panel__group">
+                <label>
+                  <span>{{t 'color_hex'}}</span>
+                  <input type="text" id="normal-hex-text" class="hex-input" placeholder="#ff6600">
+                </label>
+                <label>
+                  <span>{{t 'color_base'}}</span>
+                  <input type="color" id="normal-hex-color" value="#ff6600">
+                </label>
+              </div>
+              <div id="normal-palette" class="color-palette"></div>
+            </div>
+            <div class="color-panel" id="color-panel-glow" hidden>
+              <div class="color-panel__group">
+                <label>
+                  <span>{{t 'color_hex'}}</span>
+                  <input type="text" id="glow-base-text" class="hex-input" placeholder="#2f2f2f">
+                </label>
+                <label>
+                  <span>{{t 'color_base'}}</span>
+                  <input type="color" id="glow-base-color" value="#2f2f2f">
+                </label>
+              </div>
+              <div id="glow-base-palette" class="color-palette"></div>
+              <div class="color-panel__group">
+                <label>
+                  <span>{{t 'color_glow_hex'}}</span>
+                  <input type="text" id="glow-hex-text" class="hex-input" placeholder="#39ff14">
+                </label>
+                <label>
+                  <span>{{t 'color_glow'}}</span>
+                  <input type="color" id="glow-hex-color" value="#39ff14">
+                </label>
+              </div>
+              <div id="glow-glow-palette" class="color-palette"></div>
+            </div>
+            <div class="color-panel" id="color-panel-multicolor" hidden>
+              <label>
+                <span>{{t 'color_multicolor_count'}}</span>
+                <select id="multicolor-count">
+                  <option value="2">2</option>
+                  <option value="3">3</option>
+                  <option value="4">4</option>
+                  <option value="5">5</option>
+                  <option value="6">6</option>
+                  <option value="7">7</option>
+                </select>
+              </label>
+              <div id="multicolor-inputs" class="color-multicolor-inputs"></div>
+            </div>
+            <div class="color-panel" id="color-panel-neon" hidden>
+              <span class="color-panel__subtitle">{{t 'color_neon_palette'}}</span>
+              <div id="neon-palette" class="color-neon-palette"></div>
+            </div>
+          </div>
+          <div class="color-preview" id="color-preview" hidden>
+            <span class="color-preview__title">{{t 'color_preview'}}</span>
+            <div id="color-preview-list"></div>
+          </div>
+        </div>
+      </div>
+      <label>
+        <span>{{t 'notes'}}</span>
+        <textarea name="notes" rows="4">{{filament.notes}}</textarea>
+      </label>
+    </div>
+    <footer class="form__actions">
+      <button type="submit" class="btn">{{t 'update'}}</button>
+      <a class="btn btn--ghost" href="/filaments/{{filament.id}}">{{t 'back_to_detail'}}</a>
+    </footer>
+  </form>
+</section>
+

@@ -1,6 +1,6 @@
-# Filament Inventory / Filament Inventar
+# FilaHub
 
-Zweisprachige Dokumentation (Deutsch & Englisch). Die Anwendung verwaltet 3D-Druck-Filamentspulen, analysiert G-Code und erstellt DYMO-kompatible Etiketten mit Barcode/QR-Code.
+Zweisprachige Dokumentation (Deutsch & Englisch). FilaHub verwaltet 3D-Druck-Filamentspulen, analysiert G-Code, erstellt DYMO-kompatible Etiketten mit Barcode/QR-Code und bietet ein vollständiges Inventarsystem.
 
 ---
 
@@ -288,6 +288,7 @@ npx prisma migrate dev --name init
 - Inventory areas + scanner-driven audit workflow with colour feedback
 - Global settings (`/settings`) cover units, currency, label sizes and inventory areas
 - Optional toggle: include filament spools in the inventory report when needed
+- Windows build scripts: see `scripts/build-windows.ps1` + `installer/windows/setup.iss`
 
 ### User Guide
 
@@ -295,6 +296,7 @@ npx prisma migrate dev --name init
 - Run `Start Programm.bat` and pick the desired mode (Filament Manager or Inventory System). With `APP_MODE=both` the landing page is your switchboard.
 - Change the interface language at any time via the top-right toggle (`DE`/`EN`).
 - Use `Settings` to configure label dimensions, currency/units, required fields and to maintain the list of inventory areas (one per line).
+- Packaging: run `scripts/build-windows.ps1` to prepare `dist/windows/app`; build installer via Inno Setup (`installer/windows/setup.iss`)
 
 **Filament Manager**
 - From the landing page choose `Open Filament Manager` or use the nav item `Filament Overview`.
@@ -323,4 +325,24 @@ npx prisma migrate dev --name init
 ---
 
 Viel Spaß beim Verwalten deiner Filament-Spulen! / Happy printing! 🎉
+
+### Windows Packaging
+
+1. `powershell.exe -ExecutionPolicy Bypass -File scripts/build-windows.ps1` – erzeugt `dist/windows/app` inkl. Produktions-Abhängigkeiten.
+2. Lizenztext anpassen (`installer/windows/license.txt`).
+3. Optional: Node.js-Installer (`node-setup.msi`) in `installer/windows/` ablegen, um fehlendes Node automatisch zu installieren.
+4. Inno Setup installieren (https://jrsoftware.org/isinfo.php).
+5. `installer/windows/setup.iss` in Inno Setup öffnen und `Build` ausführen – alternativ: `powershell.exe -ExecutionPolicy Bypass -File scripts/package-windows.ps1` (ruft Build + ISCC kombiniert auf).
+6. Ergebnis: `dist/windows/installer/FilaHubSetup.exe` (Desktop-Verknüpfung zeigt auf `Start Programm.bat`).
+7. Optional: Node-Installer wird nur ausgeführt, wenn er beigelegt ist und auf dem Zielsystem kein `node` gefunden wird.
+
+### Release-Checkliste
+
+1. Projekt bauen: `npm run build` (falls vorhanden) bzw. Tests ausführen.
+2. PowerShell-Skript: `powershell.exe -ExecutionPolicy Bypass -File scripts/build-windows.ps1`.
+3. Inno Setup öffnen (`installer/windows/setup.iss`) und Installer bauen.
+4. Ergebnis (`dist/windows/installer/FilaHubSetup.exe`) testen (frische VM).
+5. Optional: Prüfen, ob Node.js mitgeliefert/erkannt wird.
+6. Dateien signieren (sofern Zertifikate vorhanden).
+7. Release-Notizen verfassen und Setup + Checksums auf GitHub veröffentlichen.
 

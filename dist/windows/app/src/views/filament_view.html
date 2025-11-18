@@ -1,0 +1,130 @@
+{{#if notFound}}
+  <section class="panel">
+    <p>Filament nicht gefunden.</p>
+  </section>
+{{else}}
+  <section class="panel filament-detail" data-id="{{filament.id}}">
+    <header class="panel__title">
+      <h1>{{filament.name}}</h1>
+      <div class="panel__actions">
+        <a class="btn btn--ghost" href="/filaments/{{filament.id}}/edit">{{t 'edit_filament'}}</a>
+        <button class="btn btn--ghost" type="button" data-action="codes">{{t 'modal_codes_button'}}</button>
+        <button class="btn" type="button" data-action="duplicate">{{t 'duplicate'}}</button>
+        {{#if filament.archived}}
+          <button class="btn" data-action="unarchive">{{t 'unarchive'}}</button>
+        {{else}}
+          <button class="btn btn--danger" data-action="archive">{{t 'archive'}}</button>
+        {{/if}}
+        <button class="btn btn--danger" type="button" data-action="delete">{{t 'delete'}}</button>
+      </div>
+    </header>
+
+    <div class="detail-grid">
+      <div>
+        <h3>{{t 'manufacturer'}}</h3>
+        <p>{{filament.manufacturer}}</p>
+      </div>
+      <div>
+        <h3>{{t 'material'}}</h3>
+        <p>{{filament.material}}</p>
+      </div>
+      <div>
+        <h3>{{t 'diameter'}} ({{ui.form.units.length}})</h3>
+        <p>{{formatLength filament.diameterMm ui.form.units.length}} {{ui.form.units.length}}</p>
+      </div>
+      <div>
+        <h3>{{t 'density'}}</h3>
+        <p>{{formatDecimal filament.density 2}} g/cm³</p>
+      </div>
+      <div>
+        <h3>{{t 'colors'}}</h3>
+        {{#if filament.colorsHex}}
+          <div class="color-swatches">
+            {{#each filament.colorsHex}}
+              <span class="color-variant">
+                {{#if labelKey}}<span class="color-variant__label">{{t labelKey}}</span>{{/if}}
+                {{#each swatches}}
+                  <span class="color-swatch-group">
+                    <span class="color-swatch {{#if glow}}color-swatch--glow{{/if}}" style="--color: {{hex}}" title="{{hex}}"></span>
+                    <span class="color-swatch__hex">{{hex}}</span>
+                    {{#if glow}}<span class="color-tag color-tag--glow">{{t 'color_glow'}}</span>{{/if}}
+                  </span>
+                {{/each}}
+                {{#if transparent}}
+                  <span class="color-tag color-tag--transparent">{{t 'color_transparent'}}</span>
+                {{/if}}
+                {{#if count}}
+                  <span class="color-variant__meta">×{{count}}</span>
+                {{/if}}
+              </span>
+            {{/each}}
+          </div>
+        {{/if}}
+      </div>
+      <div>
+        <h3>{{t 'net_weight'}} ({{ui.form.units.weight}})</h3>
+        <p>{{formatWeight filament.netWeightG ui.form.units.weight}} {{ui.form.units.weight}}</p>
+      </div>
+      <div>
+        <h3>{{t 'remaining'}} ({{ui.form.units.weight}})</h3>
+        <p id="remaining-display" data-remaining="{{formatWeight filament.remainingG ui.form.units.weight}}">{{formatWeight filament.remainingG ui.form.units.weight}} {{ui.form.units.weight}}</p>
+        <button type="button" class="btn btn--ghost btn--small" data-action="edit-remaining">{{t 'edit_remaining'}}</button>
+      </div>
+      <div>
+        <h3>{{t 'quantity'}}</h3>
+        <p>{{filament.quantity}}</p>
+      </div>
+      <div>
+        <h3>{{t 'price_new'}} ({{ui.form.currency}})</h3>
+        <p>{{#if filament.priceNewEUR}}{{ui.form.currency}} {{formatDecimal filament.priceNewEUR 2}}{{/if}}</p>
+      </div>
+      <div>
+        <h3>{{t 'product_link'}}</h3>
+        <p>{{#if filament.productUrl}}<a href="{{filament.productUrl}}" target="_blank" rel="noopener">{{filament.productUrl}}</a>{{/if}}</p>
+      </div>
+      <div>
+        <h3>{{t 'location'}}</h3>
+        <p>{{filament.location}}</p>
+      </div>
+      <div class="full">
+        <h3>{{t 'notes'}}</h3>
+        <p>{{filament.notes}}</p>
+      </div>
+    </div>
+
+    <section class="usage">
+      <h2>{{t 'usage'}}</h2>
+      <form id="usage-form" class="usage-form">
+        <input type="number" step="0.01" name="usedG" placeholder="g" required>
+        <input type="text" name="jobName" placeholder="Job">
+        <button type="submit" class="btn">{{t 'update'}}</button>
+        <button type="button" class="btn" data-action="restock">{{t 'restock'}}</button>
+      </form>
+    </section>
+
+    <section class="logs">
+      <h2>Logs</h2>
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th>{{t 'usage'}}</th>
+            <th>Quelle</th>
+            <th>Job</th>
+            <th>Datum</th>
+          </tr>
+        </thead>
+        <tbody id="log-body">
+          {{#each filament.logs}}
+            <tr>
+              <td>{{formatDecimal usedG 2}} g</td>
+              <td>{{source}}</td>
+              <td>{{jobName}}</td>
+              <td>{{createdAt}}</td>
+            </tr>
+          {{/each}}
+        </tbody>
+      </table>
+    </section>
+  </section>
+{{/if}}
+

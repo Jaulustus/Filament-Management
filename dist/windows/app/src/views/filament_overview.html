@@ -1,0 +1,86 @@
+<section class="panel">
+  <div class="panel__actions panel__actions--top">
+    <a class="btn btn--ghost" href="/">{{t 'landing_back_button'}}</a>
+  </div>
+  <div class="panel__header">
+    <input id="search-input" class="search-field" type="search" name="search" placeholder="{{t 'search'}}" autofocus>
+    <label class="toggle">
+      <input id="show-archived" type="checkbox" {{#if showArchived}}checked{{/if}}>
+      <span>{{t 'show_archived'}}</span>
+    </label>
+    <div class="total-quantity">
+      <span class="total-quantity__label">{{t 'total_quantity'}}</span>
+      <span class="total-quantity__value" id="total-quantity-value">{{totalQuantity}}</span>
+    </div>
+  </div>
+
+  <div class="table-wrapper">
+    <table class="data-table" id="filament-table">
+      <thead>
+        <tr>
+          <th>{{t 'name'}}</th>
+          <th>{{t 'material'}}</th>
+          <th>{{t 'diameter'}} ({{ui.form.units.length}})</th>
+          <th>{{t 'colors'}}</th>
+          <th>{{t 'net_weight'}} ({{ui.form.units.weight}})</th>
+          <th>{{t 'remaining'}} ({{ui.form.units.weight}})</th>
+          <th>{{t 'quantity'}}</th>
+          <th>{{t 'id_number'}}</th>
+          <th>{{t 'price_new'}}</th>
+          <th>{{t 'product_link'}}</th>
+          <th>{{t 'usage'}}</th>
+        </tr>
+      </thead>
+      <tbody>
+        {{#each filaments}}
+          <tr data-id="{{id}}" class="{{#if archived}}archived{{/if}}">
+            <td><a href="/filaments/{{id}}">{{name}}</a></td>
+            <td>{{material}}</td>
+            <td>{{formatLength diameterMm ../ui.form.units.length}}</td>
+            <td>
+              {{#if colorsHex}}
+                <div class="color-swatches">
+                  {{#each colorsHex}}
+                    <span class="color-variant">
+                      {{#if labelKey}}<span class="color-variant__label">{{t labelKey}}</span>{{/if}}
+                      {{#each swatches}}
+                        <span class="color-swatch {{#if glow}}color-swatch--glow{{/if}}" style="--color: {{hex}}" title="{{hex}}"></span>
+                      {{/each}}
+                      {{#if transparent}}
+                        <span class="color-tag color-tag--transparent">{{t 'color_transparent'}}</span>
+                      {{/if}}
+                      {{#if count}}
+                        <span class="color-variant__meta">×{{count}}</span>
+                      {{/if}}
+                    </span>
+                  {{/each}}
+                </div>
+              {{/if}}
+            </td>
+            <td>{{formatWeight netWeightG ../ui.form.units.weight}} {{../ui.form.units.weight}}</td>
+            <td data-remaining>{{formatWeight remainingG ../ui.form.units.weight}} {{../ui.form.units.weight}}</td>
+            <td>{{quantity}}</td>
+            <td>
+              <div class="id-block">
+                <span class="id-text">{{id}}</span>
+              </div>
+            </td>
+            <td>{{#if priceNewEUR}}{{../ui.form.currency}} {{formatDecimal priceNewEUR 2}}{{/if}}</td>
+            <td>{{#if productUrl}}<a href="{{productUrl}}" target="_blank" rel="noopener">Link</a>{{/if}}</td>
+            <td>
+              <button class="btn" data-action="restock">{{t 'restock'}}</button>
+              <button class="btn btn--ghost" data-action="codes">{{t 'modal_codes_button'}}</button>
+              {{#if archived}}
+                <button class="btn" data-action="unarchive">{{t 'unarchive'}}</button>
+              {{else}}
+                <button class="btn btn--danger" data-action="archive">{{t 'archive'}}</button>
+              {{/if}}
+              <button class="btn btn--danger" data-action="delete">{{t 'delete'}}</button>
+            </td>
+          </tr>
+        {{/each}}
+      </tbody>
+    </table>
+  </div>
+</section>
+

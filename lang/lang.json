@@ -1,6 +1,6 @@
 {
   "de": {
-    "app_title": "Filament Inventar",
+    "app_title": "FilaHub",
     "brand_landing": "Verwaltungshub",
     "brand_filament": "Filament Manager",
     "brand_inventory": "Inventur System",
@@ -210,7 +210,7 @@
     "dashboard_recent_title": "Zuletzt aktualisierte Filamente",
     "dashboard_recent_empty": "Noch keine Filamente vorhanden. Lege dein erstes Filament an, um zu starten."
     ,
-    "landing_title": "Willkommen im Verwaltungshub",
+    "landing_title": "FilaHub",
     "landing_intro": "Wähle, ob du den Filament Manager oder das Inventur-System öffnen möchtest.",
     "landing_filament_title": "Filament Manager",
     "landing_filament_desc": "Verwalte Spulen, drucke Etiketten und buche Verbrauch direkt vom Rechner oder Scanner.",
@@ -258,7 +258,7 @@
     "settings_inventory_area_empty": "Noch keine Bereiche angelegt."
   },
   "en": {
-    "app_title": "Filament Inventory",
+    "app_title": "FilaHub",
     "brand_landing": "Management Hub",
     "brand_filament": "Filament Manager",
     "brand_inventory": "Inventory Suite",
@@ -465,7 +465,7 @@
     "dashboard_action_inventory": "Filament audit",
     "dashboard_recent_title": "Recently updated filaments",
     "dashboard_recent_empty": "No filaments yet. Create your first spool to get started.",
-    "landing_title": "Welcome to the control hub",
+    "landing_title": "FilaHub",
     "landing_intro": "Choose whether you want to open the Filament Manager or the Inventory System.",
     "landing_filament_title": "Filament Manager",
     "landing_filament_desc": "Manage spools, handle colours and print QR/barcode labels with scanner support.",
