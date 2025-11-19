@@ -938,6 +938,7 @@ function createCodeModal() {
   let currentBarcode = '';
   let currentQr = '';
   let currentFilter = 'both';
+  let currentIncludeText = false;
   let closeTimer = null;
 
   const show = () => {
@@ -985,16 +986,18 @@ function createCodeModal() {
     }
   };
 
-  const open = ({ label, barcodeValue, qrValue }) => {
+  const open = ({ label, barcodeValue, qrValue, includeText = false }) => {
     currentBarcode = barcodeValue || '';
     currentQr = qrValue || barcodeValue || '';
+    currentIncludeText = includeText;
     applyFilter('both');
     if (titleEl) {
       titleEl.textContent = t('modal_codes_title');
     }
     setSubtitle(label || '');
+    const textParam = includeText ? '&includetext=true' : '';
     if (barcodeImg) {
-      barcodeImg.src = `/api/codes/barcode.png?id=${encodeURIComponent(currentBarcode)}`;
+      barcodeImg.src = `/api/codes/barcode.png?id=${encodeURIComponent(currentBarcode)}${textParam}`;
     }
     if (qrImg) {
       qrImg.src = `/api/codes/qr.png?text=${encodeURIComponent(currentQr)}`;
@@ -1002,7 +1005,155 @@ function createCodeModal() {
     show();
   };
 
-  const printCodes = () => {
+  // Hilfsfunktion: Konvertiert mm zu TWIPS (1 TWIP = 1/1440 inch, 1 inch = 25.4mm)
+  const mmToTwips = (mm) => Math.round((mm / 25.4) * 1440);
+
+  // Hilfsfunktion: Lädt Bild als Base64
+  const imageToBase64 = async (url) => {
+    try {
+      // Versuche zuerst über fetch (funktioniert auch mit CORS)
+      const response = await fetch(url);
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      const blob = await response.blob();
+      return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onloadend = () => resolve(reader.result);
+        reader.onerror = reject;
+        reader.readAsDataURL(blob);
+      });
+    } catch (error) {
+      // Fallback: Canvas-Methode
+      return new Promise((resolve, reject) => {
+        const img = new Image();
+        img.crossOrigin = 'anonymous';
+        img.onload = () => {
+          const canvas = document.createElement('canvas');
+          canvas.width = img.width;
+          canvas.height = img.height;
+          const ctx = canvas.getContext('2d');
+          ctx.drawImage(img, 0, 0);
+          try {
+            const base64 = canvas.toDataURL('image/png');
+            resolve(base64);
+          } catch (err) {
+            reject(err);
+          }
+        };
+        img.onerror = reject;
+        img.src = url;
+      });
+    }
+  };
+
+  // Drucken mit DYMO Label Framework
+  const printWithDymo = async (shouldPrintBarcode, shouldPrintQr) => {
+    // Prüfe ob DYMO Framework verfügbar ist
+    if (typeof window.dymo === 'undefined' || !window.dymo.label.framework) {
+      console.log('DYMO Framework nicht verfügbar, verwende Browser-Druck');
+      return false;
+    }
+
+    try {
+      const framework = window.dymo.label.framework;
+      await framework.init();
+
+      // Finde LabelWriter Drucker
+      const printers = framework.getPrinters();
+      if (!printers || printers.length === 0) {
+        console.log('Kein DYMO Drucker gefunden, verwende Browser-Druck');
+        return false;
+      }
+
+      // Verwende ersten LabelWriter (normalerweise LabelWriter 550)
+      const printerName = printers.find(p => p.includes('LabelWriter')) || printers[0];
+      if (!printerName) {
+        console.log('Kein LabelWriter gefunden, verwende Browser-Druck');
+        return false;
+      }
+
+      // Lade Druckprofil
+      const profile = window.__PRINT_PROFILE__ || null;
+      const labelWidth = profile?.labelWidth || 57; // mm
+      const labelHeight = profile?.labelHeight || 32; // mm
+
+      // Konvertiere mm zu TWIPS für DYMO
+      const widthTwips = mmToTwips(labelWidth);
+      const heightTwips = mmToTwips(labelHeight);
+
+      // Lade Bilder als Base64
+      const safeBarcode = encodeURIComponent(currentBarcode);
+      const safeQr = encodeURIComponent(currentQr || currentBarcode);
+      const isEan = currentIncludeText || /^[0-9]{8,}$/.test(currentBarcode);
+      const textParam = isEan ? '&includetext=true' : '';
+
+      let barcodeBase64 = null;
+      let qrBase64 = null;
+
+      if (shouldPrintBarcode) {
+        try {
+          barcodeBase64 = await imageToBase64(`/api/codes/barcode.png?id=${safeBarcode}${textParam}`);
+        } catch (error) {
+          console.error('Fehler beim Laden des Barcodes:', error);
+          return false;
+        }
+      }
+
+      if (shouldPrintQr) {
+        try {
+          qrBase64 = await imageToBase64(`/api/codes/qr.png?text=${safeQr}`);
+        } catch (error) {
+          console.error('Fehler beim Laden des QR-Codes:', error);
+          return false;
+        }
+      }
+
+      // Erstelle Label-XML
+      const labelXml = `<?xml version="1.0" encoding="utf-8"?>
+<DieCutLabel Version="8.0" Units="twips" XDim="${widthTwips}" YDim="${heightTwips}">
+  <PaperOrientation>Landscape</PaperOrientation>
+  <Id>LW 32x57mm</Id>
+  <PaperName>LW 32x57mm</PaperName>
+  <DrawCommands>
+    <RoundRectangle X="0" Y="0" Width="${widthTwips}" Height="${heightTwips}" Rx="0" Ry="0"/>
+    ${shouldPrintBarcode && barcodeBase64 ? `
+    <ImageObject X="0" Y="0" Width="${widthTwips}" Height="${heightTwips}">
+      <ImageData>${barcodeBase64}</ImageData>
+      <SizeMode>Fit</SizeMode>
+      <HorizontalAlignment>Center</HorizontalAlignment>
+      <VerticalAlignment>Middle</VerticalAlignment>
+    </ImageObject>
+    ` : ''}
+    ${shouldPrintQr && qrBase64 && shouldPrintBarcode ? `
+    <ImageObject X="${Math.round(widthTwips / 2)}" Y="0" Width="${Math.round(widthTwips / 2)}" Height="${heightTwips}">
+      <ImageData>${qrBase64}</ImageData>
+      <SizeMode>Fit</SizeMode>
+      <HorizontalAlignment>Center</HorizontalAlignment>
+      <VerticalAlignment>Middle</VerticalAlignment>
+    </ImageObject>
+    ` : shouldPrintQr && qrBase64 ? `
+    <ImageObject X="0" Y="0" Width="${widthTwips}" Height="${heightTwips}">
+      <ImageData>${qrBase64}</ImageData>
+      <SizeMode>Fit</SizeMode>
+      <HorizontalAlignment>Center</HorizontalAlignment>
+      <VerticalAlignment>Middle</VerticalAlignment>
+    </ImageObject>
+    ` : ''}
+  </DrawCommands>
+</DieCutLabel>`;
+
+      // Drucke Label
+      framework.printLabel(printerName, '', labelXml);
+      console.log('Label erfolgreich mit DYMO gedruckt');
+      return true;
+    } catch (error) {
+      console.error('Fehler beim Drucken mit DYMO:', error);
+      return false;
+    }
+  };
+
+  const printCodes = async () => {
     if (!currentBarcode) {
       return;
     }
@@ -1011,19 +1162,39 @@ function createCodeModal() {
     if (!shouldPrintBarcode && !shouldPrintQr) {
       return;
     }
+
+    // Versuche zuerst mit DYMO zu drucken
+    const dymoSuccess = await printWithDymo(shouldPrintBarcode, shouldPrintQr);
+    if (dymoSuccess) {
+      return;
+    }
+
+    // Fallback: Browser-Druck
     const printWindow = window.open('', '_blank', 'width=720,height=480');
     if (!printWindow) {
       return;
     }
     const safeBarcode = encodeURIComponent(currentBarcode);
     const safeQr = encodeURIComponent(currentQr || currentBarcode);
-    const safeLabel = escapeHtml(subtitleEl?.textContent || '');
+    // Verwende die gespeicherte includeText-Option oder prüfe ob es ein EAN ist (nur Zahlen, mindestens 8 Zeichen)
+    const isEan = currentIncludeText || /^[0-9]{8,}$/.test(currentBarcode);
+    const textParam = isEan ? '&includetext=true' : '';
+    
+    // Lade Druckprofil aus globaler Variable
+    const profile = window.__PRINT_PROFILE__ || null;
+    const labelWidth = profile?.labelWidth || 57;
+    const labelHeight = profile?.labelHeight || 32;
+    const orientation = profile?.orientation || 'landscape';
+    const cssSettings = profile?.css || {};
+    const padding = cssSettings.padding || '0.5mm';
+    const maxWidth = cssSettings.maxWidth || '25mm';
+    const maxHeight = cssSettings.maxHeight || '55mm';
+    
     const codeFragments = [];
     if (shouldPrintBarcode) {
       codeFragments.push(`
             <div class="code-block">
-              <img src="/api/codes/barcode.png?id=${safeBarcode}" alt="${escapeHtml(t('modal_barcode_alt'))}">
-              <p>${escapeHtml(t('barcode'))}</p>
+              <img src="/api/codes/barcode.png?id=${safeBarcode}${textParam}" alt="${escapeHtml(t('modal_barcode_alt'))}">
             </div>
       `);
     }
@@ -1031,7 +1202,6 @@ function createCodeModal() {
       codeFragments.push(`
             <div class="code-block">
               <img src="/api/codes/qr.png?text=${safeQr}" alt="${escapeHtml(t('modal_qr_alt'))}">
-              <p>${escapeHtml(t('qrcode'))}</p>
             </div>
       `);
     }
@@ -1043,19 +1213,80 @@ function createCodeModal() {
           <meta charset="utf-8">
           <title></title>
           <style>
-            @page { margin: 12mm; }
-            body { font-family: Arial, sans-serif; padding: 12mm; text-align: center; color: #000; }
-            h1 { font-size: 16px; margin: 0 0 6px 0; }
-            p { margin: 0 0 12px 0; font-size: 12px; }
-            .codes { display: flex; gap: 24px; justify-content: center; align-items: flex-start; }
-            .codes--single { justify-content: center; }
-            .code-block { display: flex; flex-direction: column; gap: 8px; align-items: center; }
-            .codes img { max-width: 260px; border: 1px solid #ccc; padding: 8px; background: #fff; }
-            .code-block p { margin: 0; font-size: 0.85rem; text-transform: uppercase; letter-spacing: 0.08em; }
+            /* Label: ${labelHeight}mm Höhe × ${labelWidth}mm Breite (${orientation}) */
+            @page {
+              size: ${labelWidth}mm ${labelHeight}mm; /* CSS: width × height */
+              margin: 0;
+              padding: 0;
+            }
+            * {
+              box-sizing: border-box;
+            }
+            html, body {
+              width: ${labelWidth}mm; /* Breite */
+              height: ${labelHeight}mm; /* Höhe */
+              margin: 0;
+              padding: 0;
+              background: #fff;
+              color: #000;
+              overflow: hidden;
+            }
+            body {
+              font-family: Arial, sans-serif;
+              display: flex;
+              align-items: center;
+              justify-content: center;
+            }
+            .codes {
+              width: ${labelWidth}mm; /* Breite */
+              height: ${labelHeight}mm; /* Höhe */
+              max-width: ${labelWidth}mm;
+              max-height: ${labelHeight}mm;
+              display: flex;
+              gap: 0;
+              justify-content: center;
+              align-items: center;
+              padding: ${padding};
+              page-break-after: always;
+              page-break-inside: avoid;
+              overflow: hidden;
+            }
+            .codes--single {
+              justify-content: center;
+            }
+            .codes--multiple {
+              flex-direction: row;
+              gap: 0.5mm;
+            }
+            .code-block {
+              display: flex;
+              flex-direction: column;
+              align-items: center;
+              justify-content: center;
+              page-break-inside: avoid;
+              width: 100%;
+              height: 100%;
+            }
+            .codes--multiple .code-block {
+              width: 50%;
+            }
+            .codes img {
+              max-width: ${maxWidth}; /* Breite nach Rotation (vertikaler Barcode) */
+              max-height: ${maxHeight}; /* Höhe nach Rotation (vertikaler Barcode) */
+              width: auto;
+              height: auto;
+              object-fit: contain;
+              display: block;
+            }
+            /* Sicherstellen, dass nichts über die Label-Grenzen hinausgeht */
+            .codes,
+            .code-block,
+            .codes img {
+              box-sizing: border-box;
+            }
           </style>
         </head>
         <body>
-          ${safeLabel ? `<p>${safeLabel}</p>` : ''}
           <div class="${codesClass}">
             ${codeFragments.join('')}
           </div>
@@ -1277,10 +1508,14 @@ function initInventoryManagerOverview() {
       }
       const label = row.querySelector('.inventory-name')?.textContent?.trim() || button.dataset.internal || '';
       const internal = button.dataset.internal || label || '';
+      const ean = button.dataset.ean || '';
+      // Wenn ein EAN vorhanden ist und der interne Code dem EAN entspricht (nur Zahlen), Text anzeigen
+      const isEan = ean && ean.length >= 8 && /^[0-9]+$/.test(ean) && internal === ean;
       codeModalInstance.open({
         label,
         barcodeValue: internal,
-        qrValue: internal
+        qrValue: internal,
+        includeText: isEan
       });
     } else if (action === 'quantity') {
       const currentQuantity = Number(row.dataset.quantity || 0);

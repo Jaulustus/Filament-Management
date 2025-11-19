@@ -98,7 +98,7 @@
               <td>
                 <div class="table-actions">
                   <a class="btn btn--ghost" href="/products/{{this.id}}/edit">{{t 'inventory_edit_button'}}</a>
-                  <button class="btn btn--ghost" data-action="codes" data-internal="{{this.internalCode}}">{{t 'modal_codes_button'}}</button>
+                  <button class="btn btn--ghost" data-action="codes" data-internal="{{this.internalCode}}" data-ean="{{this.displayEan}}">{{t 'modal_codes_button'}}</button>
                   <button class="btn btn--ghost" data-action="quantity">{{t 'inventory_change_quantity'}}</button>
                   {{#if this.archived}}
                     <button class="btn" data-action="unarchive">{{t 'inventory_unarchive'}}</button>

@@ -1094,28 +1094,27 @@ tr.inventory-row--empty {
 }
 
 .label {
-  width: 336px; /* 89mm @ 3.78px/mm */
-  height: 136px; /* 36mm */
+  width: 215px; /* 57mm Breite @ 3.78px/mm */
+  height: 121px; /* 32mm Höhe @ 3.78px/mm */
   background: #fff;
   color: #000;
-  padding: 1rem;
+  padding: 0.4rem;
   box-sizing: border-box;
-  border-radius: 6px;
+  border-radius: 4px;
   display: flex;
   flex-direction: column;
   justify-content: space-between;
-}
-
-.label__header h1 {
-  margin: 0 0 0.25rem 0;
-  font-size: 1.1rem;
+  align-items: center;
 }
 
 .label__codes {
   display: flex;
-  justify-content: space-between;
+  flex-direction: row;
+  justify-content: center;
   align-items: center;
-  gap: 1rem;
+  gap: 0.3rem;
+  flex: 1;
+  width: 100%;
 }
 
 .label__codes--single {
@@ -1123,35 +1122,103 @@ tr.inventory-row--empty {
 }
 
 .label__barcode {
-  flex: 1;
+  max-width: 27mm; /* Barcode ist vertikal gedreht */
+  max-height: 27mm;
   object-fit: contain;
 }
 
 .label__qr {
+  max-width: 22px;
+  max-height: 22px;
   object-fit: contain;
 }
 
-.label__meta {
+.label__footer {
+  width: 100%;
+  text-align: center;
+  margin-top: 0.25rem;
+}
+
+.label__id {
+  margin: 0;
+  font-size: 0.7rem;
+  font-weight: 600;
+  line-height: 1.2;
+  color: #000;
+}
+
+.print-hint {
+  max-width: 600px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 8px;
+  padding: 1rem;
+  margin: 1rem 0;
   font-size: 0.9rem;
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 0.25rem 0.75rem;
+}
+
+.print-hint p {
+  margin: 0.5rem 0;
+}
+
+.print-hint ul {
+  margin: 0.5rem 0;
+  padding-left: 1.5rem;
+}
+
+.print-hint li {
+  margin: 0.25rem 0;
+}
+
+/* Label: 32mm Höhe × 57mm Breite (Querformat) */
+@page {
+  size: 57mm 32mm; /* CSS: width × height */
+  margin: 0;
+  padding: 0;
 }
 
 @media print {
-  body {
+  * {
+    box-sizing: border-box;
+  }
+  html, body {
+    width: 57mm; /* Breite */
+    height: 32mm; /* Höhe */
+    margin: 0;
+    padding: 0;
     background: #fff;
     color: #000;
+    overflow: hidden;
   }
   .topbar,
-  #print-button {
+  #print-button,
+  #print-hint {
     display: none;
   }
   .label-page {
+    width: 57mm; /* Breite */
+    height: 32mm; /* Höhe */
     padding: 0;
+    margin: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    page-break-after: always;
+    page-break-inside: avoid;
   }
   .label {
+    width: 57mm; /* Breite */
+    height: 32mm; /* Höhe */
+    max-width: 57mm;
+    max-height: 32mm;
     box-shadow: none;
+    margin: 0;
+    padding: 2mm;
+    page-break-after: always;
+    page-break-inside: avoid;
+  }
+  .label:last-child {
+    page-break-after: auto;
   }
 }
 

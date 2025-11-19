@@ -367,6 +367,13 @@ app.use((req, res, next) => {
   res.locals.topbarBrandKey = brandKeyMap[context] || 'app_title';
   res.locals.topbarLogoKey = context === 'inventory' ? 'brand_inventory' : null;
   res.locals.showLanguageSwitcher = true;
+  
+  // Druckprofil für JavaScript verfügbar machen
+  const config = req.app.locals.config || {};
+  const activeProfileName = config.activePrintProfile || defaultConfig.activePrintProfile;
+  const profiles = config.printProfiles || defaultConfig.printProfiles;
+  res.locals.printProfile = profiles[activeProfileName] || profiles['LW 32x57mm'] || null;
+  
   next();
 });
 
@@ -535,6 +542,8 @@ app.get('/settings', async (req, res, next) => {
   try {
     const prismaClient = req.app.get('prisma');
     const areaRecords = await prismaClient.inventoryArea.findMany({ orderBy: { name: 'asc' } });
+    const config = req.app.locals.config || {};
+    const printProfiles = config.printProfiles || defaultConfig.printProfiles;
     res.render('settings', {
       config: req.app.locals.config,
       ui: req.app.locals.ui,
@@ -542,6 +551,7 @@ app.get('/settings', async (req, res, next) => {
       weightOptions,
       currencyOptions,
       requiredFieldDefs,
+      printProfiles,
       includeFilamentsInInventoryReport: Boolean(req.app.locals.config?.includeFilamentsInInventoryReport),
       inventoryAreasText: areaRecords.map((area) => area.name).join('\n'),
       inventoryAreasList: areaRecords.map((area) => area.name),
@@ -605,6 +615,15 @@ app.post('/settings', async (req, res, next) => {
   current.includeFilamentsInInventoryReport = Boolean(
     incoming.includeFilamentsInInventoryReport && incoming.includeFilamentsInInventoryReport !== '0'
   );
+
+  // Druckprofil speichern
+  const printProfiles = current.printProfiles || defaultConfig.printProfiles;
+  const activeProfileName = incoming.activePrintProfile?.trim();
+  if (activeProfileName && printProfiles[activeProfileName]) {
+    current.activePrintProfile = activeProfileName;
+  } else {
+    current.activePrintProfile = defaultConfig.activePrintProfile;
+  }
 
   try {
     const prismaClient = req.app.get('prisma');

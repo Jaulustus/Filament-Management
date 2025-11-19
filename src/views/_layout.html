@@ -73,6 +73,9 @@
   <script id="translations-data" type="application/json">
     {{{json translationStrings}}}
   </script>
+  <script id="print-profile-data" type="application/json">
+    {{{json printProfile}}}
+  </script>
   <script>
     window.__LANG__ = "{{lang}}";
     (function () {
@@ -88,7 +91,22 @@
         window.__T__ = {};
       }
     })();
+    (function () {
+      const node = document.getElementById('print-profile-data');
+      if (!node) {
+        window.__PRINT_PROFILE__ = null;
+        return;
+      }
+      try {
+        window.__PRINT_PROFILE__ = JSON.parse(node.textContent || 'null');
+      } catch (error) {
+        console.warn('Failed to parse print profile', error);
+        window.__PRINT_PROFILE__ = null;
+      }
+    })();
   </script>
+  <!-- DYMO Label Framework - wird von DYMO Connect installiert -->
+  <script src="https://labelwriter.com/software/dls/sdk/js/dymo.label.framework.8.5.2.js" defer onerror="console.warn('DYMO Label Framework konnte nicht geladen werden. Bitte DYMO Connect installieren.')"></script>
   <script src="/js/app.js" defer></script>
 </body>
 </html>

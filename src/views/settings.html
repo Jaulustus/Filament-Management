@@ -40,6 +40,23 @@
 
         <section class="settings-card" data-settings-card>
           <header class="settings-card__header">
+            <h3>{{t 'settings_print_profile_title'}}</h3>
+            <p class="settings-card__hint">{{t 'settings_print_profile_hint'}}</p>
+          </header>
+          <div class="settings-grid settings-grid--small">
+            <label>
+              <span>{{t 'settings_print_profile_label'}}</span>
+              <select name="activePrintProfile">
+                {{#each printProfiles}}
+                  <option value="{{@key}}" {{#if (eq ../../config.activePrintProfile @key)}}selected{{/if}}>{{this.name}}</option>
+                {{/each}}
+              </select>
+            </label>
+          </div>
+        </section>
+
+        <section class="settings-card" data-settings-card>
+          <header class="settings-card__header">
             <h3>{{t 'settings_units'}}</h3>
             <p class="settings-card__hint">{{t 'settings_units_hint'}}</p>
           </header>

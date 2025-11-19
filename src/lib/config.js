@@ -25,7 +25,33 @@ export const defaultConfig = {
     barcodeWidthMm: 60,
     barcodeHeightMm: 25,
     qrSizeMm: 25
-  }
+  },
+  printProfiles: {
+    'LW 32x57mm': {
+      name: 'LW 32x57mm',
+      labelHeight: 32,
+      labelWidth: 57,
+      orientation: 'landscape',
+      barcode: {
+        scale: 2,
+        height: 7,
+        rotate: 'R',
+        textsize: 7,
+        paddingwidth: 2,
+        paddingheight: 1
+      },
+      qr: {
+        scale: 5,
+        margin: 1
+      },
+      css: {
+        padding: '0.5mm',
+        maxWidth: '27mm',
+        maxHeight: '27mm'
+      }
+    }
+  },
+  activePrintProfile: 'LW 32x57mm'
 };
 
 function ensureDirectoryExists() {
@@ -66,6 +92,11 @@ function mergeWithDefaults(config) {
     ...defaultConfig.labelSizes,
     ...(config.labelSizes || {})
   };
+  merged.printProfiles = {
+    ...defaultConfig.printProfiles,
+    ...(config.printProfiles || {})
+  };
+  merged.activePrintProfile = config.activePrintProfile || defaultConfig.activePrintProfile;
   merged.inventoryAreas = Array.isArray(config.inventoryAreas)
     ? config.inventoryAreas.filter((value) => typeof value === 'string' && value.trim().length)
     : [];

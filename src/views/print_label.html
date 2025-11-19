@@ -5,10 +5,6 @@
 {{else}}
   <section class="label-page">
     <div class="label" id="label" data-id="{{label.id}}">
-      <div class="label__header">
-        <h1>{{label.name}}</h1>
-        <p>{{label.manufacturer}} – {{label.material}} – {{formatLength label.diameterMm ui.form.units.length}} {{ui.form.units.length}}</p>
-      </div>
       {{#if (eq labelType 'both')}}
         <div class="label__codes">
           <img src="{{label.barcodeUrl}}" alt="Barcode" class="label__barcode" style="width: {{formatDecimal label.barcodeWidthPx 2}}px; height: {{formatDecimal label.barcodeHeightPx 2}}px;">
@@ -23,27 +19,19 @@
           {{/if}}
         </div>
       {{/if}}
-      <div class="label__meta">
-        <p><strong>ID:</strong> {{label.id}}</p>
-        <p><strong>{{t 'colors'}}:</strong>
-          {{#each label.colors}}
-            <span class="color-variant">
-              {{#if labelKey}}<span class="color-variant__label">{{t labelKey}}</span>{{/if}}
-              {{#each swatches}}
-                <span class="color-swatch {{#if glow}}color-swatch--glow{{/if}}" style="--color: {{hex}}" title="{{hex}}"></span>
-              {{/each}}
-              {{#if transparent}}
-                <span class="color-tag color-tag--transparent">{{t 'color_transparent'}}</span>
-              {{/if}}
-              {{#if count}}
-                <span class="color-variant__meta">×{{count}}</span>
-              {{/if}}
-            </span>
-          {{/each}}
-        </p>
-        <p><strong>{{t 'net_weight'}}:</strong> {{formatWeight label.netWeightG ui.form.units.weight}} {{ui.form.units.weight}}</p>
-        <p><strong>{{t 'remaining'}}:</strong> {{formatWeight label.remainingG ui.form.units.weight}} {{ui.form.units.weight}}</p>
+      <div class="label__footer">
+        <p class="label__id">{{label.id}}</p>
       </div>
+    </div>
+    <div class="print-hint" id="print-hint">
+      <p><strong>{{t 'print_hint_title'}}:</strong></p>
+      <p>{{t 'print_hint_text'}}</p>
+      <ul>
+        <li>{{t 'print_hint_paper'}}: <strong>{{t 'print_hint_custom'}}</strong> → <strong>32mm × 57mm</strong> (Höhe × Breite)</li>
+        <li>{{t 'print_hint_orientation'}}: <strong>{{t 'landscape'}}</strong></li>
+        <li>{{t 'print_hint_margins'}}: <strong>{{t 'none'}}</strong> (0mm)</li>
+        <li>{{t 'print_hint_scale'}}: <strong>100%</strong> (nicht skalieren)</li>
+      </ul>
     </div>
     <button class="btn" id="print-button">{{t 'print_label'}}</button>
   </section>
